@@ -15,6 +15,10 @@
 #include <set>
 #include <map>
 #include <queue>
+#include "klee/Internal/Module/InstructionInfoTable.h"
+#include <string>
+
+using namespace std;
 
 namespace llvm {
   class BasicBlock;
@@ -76,7 +80,8 @@ namespace klee {
       NURS_Depth,
       NURS_ICnt,
       NURS_CPICnt,
-      NURS_QC
+      NURS_QC, 
+      TargetedSearch
     };
   };
 
@@ -119,6 +124,24 @@ namespace klee {
     bool empty() { return states.empty(); }
     void printName(llvm::raw_ostream &os) {
       os << "RandomSearcher\n";
+    }
+  };
+
+  class TargetedSearcher : public Searcher {
+      std::vector<ExecutionState*> states;
+      std::string target_file;
+      unsigned int target_line;
+
+  public:
+    TargetedSearcher(std::string _target_file, unsigned int _target_line);
+    ExecutionState &selectState();
+    void update(ExecutionState *current,
+                const std::set<ExecutionState*> &addedStates,
+                const std::set<ExecutionState*> &removedStates);
+    unsigned int shortestDistance(ExecutionState *current);
+    bool empty() { return states.empty(); }
+    void printName(llvm::raw_ostream &os) {
+      os << "TargetedSearcher\n";
     }
   };
 

@@ -44,9 +44,13 @@
 #include <cassert>
 #include <fstream>
 #include <climits>
+#include <iostream>
+#include <fstream>
+#include <string>
 
 using namespace klee;
 using namespace llvm;
+using namespace std;
 
 namespace {
   cl::opt<bool>
@@ -146,6 +150,67 @@ RandomSearcher::update(ExecutionState *current,
   for (std::vector<ExecutionState *>::const_iterator it = removedStates.begin(),
                                                      ie = removedStates.end();
        it != ie; ++it) {
+    ExecutionState *es = *it;
+    bool ok = false;
+
+    for (std::vector<ExecutionState*>::iterator it = states.begin(),
+           ie = states.end(); it != ie; ++it) {
+      if (es==*it) {
+        states.erase(it);
+        ok = true;
+        break;
+      }
+    }
+    
+    assert(ok && "invalid state removed");
+  }
+}
+
+TargetedSearcher::TargetedSearcher(std::string _target_file, unsigned int _target_line) {
+
+    target_file = _target_file;
+    target_line = _target_line;
+}
+
+/*
+TargetedSearcher::~TargetedSearcher() {
+    delete target;
+}
+*/
+
+unsigned int TargetedSearcher::shortestDistance(ExecutionState *current) {
+    int diff = int(target_line) - int(current->pc->info->line);
+    if (diff<0)
+        return UINT_MAX;
+    
+    if (current->pc->info->file == target_file) {
+        return diff;
+    }
+    return UINT_MAX;
+}
+
+ExecutionState &TargetedSearcher::selectState() {
+    unsigned int foundShortestDistance = UINT_MAX;
+    unsigned int foundShortestDistanceStateIndex = 0;
+    for (unsigned int i=0; i<states.size(); i++) {
+        unsigned int curShortestDistance = shortestDistance(states[i]);
+        if (curShortestDistance < foundShortestDistance) {
+            foundShortestDistance = curShortestDistance;
+            foundShortestDistanceStateIndex = i;
+        }
+    }
+
+    return *states[foundShortestDistanceStateIndex];
+}
+
+void TargetedSearcher::update(ExecutionState *current,
+        const std::set<ExecutionState*> &addedStates,
+        const std::set<ExecutionState*> &removedStates) {
+  states.insert(states.end(),
+                addedStates.begin(),
+                addedStates.end());
+  for (std::set<ExecutionState*>::const_iterator it = removedStates.begin(),
+         ie = removedStates.end(); it != ie; ++it) {
     ExecutionState *es = *it;
     bool ok = false;
 
