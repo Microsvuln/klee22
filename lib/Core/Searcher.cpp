@@ -45,12 +45,10 @@
 #include <fstream>
 #include <climits>
 #include <iostream>
-#include <fstream>
 #include <string>
 
 using namespace klee;
 using namespace llvm;
-using namespace std;
 
 namespace {
   cl::opt<bool>

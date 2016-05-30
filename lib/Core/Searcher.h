@@ -15,10 +15,7 @@
 #include <set>
 #include <map>
 #include <queue>
-#include "klee/Internal/Module/InstructionInfoTable.h"
 #include <string>
-
-using namespace std;
 
 namespace llvm {
   class BasicBlock;

@@ -16,7 +16,6 @@
 #include "llvm/Support/CommandLine.h"
 #include <string>
 #include <fstream>
-using namespace std;
 using namespace llvm;
 using namespace klee;
 
