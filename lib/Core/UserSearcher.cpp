@@ -15,7 +15,7 @@
 #include "klee/Internal/Support/ErrorHandling.h"
 #include "llvm/Support/CommandLine.h"
 #include <string>
-#include <fstream>
+
 using namespace llvm;
 using namespace klee;
 
@@ -63,6 +63,16 @@ namespace {
   UseBumpMerge("use-bump-merge", 
            cl::desc("Enable support for klee_merge() (extra experimental)"));
 
+  cl::opt<unsigned int>
+  TargetedSearchLine("targeted-search-line",
+                    cl::desc("Line number of the target for targeted search"),
+                    cl::init(-1));
+
+  cl::opt<std::string>
+  TargetedSearchFilename("targeted-search-file",
+                    cl::desc("Filename containing the target for targeted search"),
+                    cl::init("-"));
+
 }
 
 
@@ -88,17 +98,15 @@ Searcher *getNewSearcher(Searcher::CoreSearchType type, Executor &executor) {
   case Searcher::NURS_ICnt: searcher = new WeightedRandomSearcher(WeightedRandomSearcher::InstCount); break;
   case Searcher::NURS_CPICnt: searcher = new WeightedRandomSearcher(WeightedRandomSearcher::CPInstCount); break;
   case Searcher::NURS_QC: searcher = new WeightedRandomSearcher(WeightedRandomSearcher::QueryCost); break;
-  case Searcher::TargetedSearch: // InstructionInfo *_target = new InstructionInfo(101, "dummy.bc", 1000, 1000);
-                          std::string target_filename = "/mnt/ext-hdd/global_target.txt";         
-                          std::ifstream target_file(target_filename.c_str());
-                          std::string source;
-                          unsigned int line;
-                          target_file >> source;
-                          target_file >> line;
-
-                          searcher = new TargetedSearcher(source, line);
-                          target_file.close();
-                          break;
+  case Searcher::TargetedSearch:
+    // Check for valid information for filename and linenumber
+    if (TargetedSearchLine == UINT_MAX || TargetedSearchFilename == "-") {
+      llvm::errs() << "TargetedSearch is missing target information \n";
+      llvm::errs() << " please add --targeted-search-line= and --targeted-search-file= \n";
+      exit(1);
+    }
+    searcher = new TargetedSearcher(TargetedSearchFilename, TargetedSearchLine);
+    break;
   }
 
   return searcher;
