@@ -32,7 +32,7 @@ namespace {
 			clEnumValN(Searcher::NURS_ICnt, "nurs:icnt", "use NURS with Instr-Count"),
 			clEnumValN(Searcher::NURS_CPICnt, "nurs:cpicnt", "use NURS with CallPath-Instr-Count"),
 			clEnumValN(Searcher::NURS_QC, "nurs:qc", "use NURS with Query-Cost"),
-			clEnumValN(Searcher::TargetedSearch, "targeted-search", "use targeted-search with instruction level target"),
+			clEnumValN(Searcher::LD2T, "ld2t", "use least decisions to target function call"),
 			clEnumValEnd));
 
   cl::opt<bool>
@@ -63,14 +63,9 @@ namespace {
   UseBumpMerge("use-bump-merge", 
            cl::desc("Enable support for klee_merge() (extra experimental)"));
 
-  cl::opt<unsigned int>
-  TargetedSearchLine("targeted-search-line",
-                    cl::desc("Line number of the target for targeted search"),
-                    cl::init(-1));
-
   cl::opt<std::string>
-  TargetedSearchFilename("targeted-search-file",
-                    cl::desc("Filename containing the target for targeted search"),
+  TargetedFunctionName("targeted-function",
+                    cl::desc("Name of the function, that should be reached"),
                     cl::init("-"));
 
 }
@@ -98,14 +93,14 @@ Searcher *getNewSearcher(Searcher::CoreSearchType type, Executor &executor) {
   case Searcher::NURS_ICnt: searcher = new WeightedRandomSearcher(WeightedRandomSearcher::InstCount); break;
   case Searcher::NURS_CPICnt: searcher = new WeightedRandomSearcher(WeightedRandomSearcher::CPInstCount); break;
   case Searcher::NURS_QC: searcher = new WeightedRandomSearcher(WeightedRandomSearcher::QueryCost); break;
-  case Searcher::TargetedSearch:
-    // Check for valid information for filename and linenumber
-    if (TargetedSearchLine == UINT_MAX || TargetedSearchFilename == "-") {
-      llvm::errs() << "TargetedSearch is missing target information \n";
-      llvm::errs() << " please add --targeted-search-line= and --targeted-search-file= \n";
+  case Searcher::LD2T:
+    // Check for valid information for the function name
+    if (TargetedFunctionName == "-") {
+      llvm::errs() << "LD2T is missing target information \n";
+      llvm::errs() << " please add --targeted-function=... to your parameters\n";
       exit(1);
     }
-    searcher = new TargetedSearcher(TargetedSearchFilename, TargetedSearchLine);
+    searcher = new LeastDecisions2TargetSearcher(TargetedFunctionName);
     break;
   }
 

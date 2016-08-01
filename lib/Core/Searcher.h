@@ -77,8 +77,8 @@ namespace klee {
       NURS_Depth,
       NURS_ICnt,
       NURS_CPICnt,
-      NURS_QC, 
-      TargetedSearch
+      NURS_QC,
+      LD2T
     };
   };
 
@@ -124,22 +124,23 @@ namespace klee {
     }
   };
 
-  class TargetedSearcher : public Searcher {
-      std::vector<ExecutionState*> states;
-      std::string target_file;
-      unsigned int target_line;
+  class LeastDecisions2TargetSearcher : public Searcher {
+    std::string target;
+    std::multimap<uint, ExecutionState*> storage;
 
   public:
-    TargetedSearcher(std::string _target_file, unsigned int _target_line);
+    LeastDecisions2TargetSearcher(std::string _target) : target(_target) {
+                                  /* emtpty */};
     ExecutionState &selectState();
     void update(ExecutionState *current,
                 const std::set<ExecutionState*> &addedStates,
                 const std::set<ExecutionState*> &removedStates);
-    unsigned int shortestDistance(ExecutionState *current);
-    bool empty() { return states.empty(); }
+    bool empty() { return storage.empty(); }
     void printName(llvm::raw_ostream &os) {
-      os << "TargetedSearcher\n";
+      os << "LeastDecisions2TargetSearcher\n";
     }
+  private:
+    uint countFutureDecisions2Target(ExecutionState* state);
   };
 
   class WeightedRandomSearcher : public Searcher {

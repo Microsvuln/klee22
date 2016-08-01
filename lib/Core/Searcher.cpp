@@ -13,6 +13,7 @@
 #include "Executor.h"
 #include "PTree.h"
 #include "StatsTracker.h"
+#include "Decisions2TargetCallSearcher.h"
 
 #include "klee/ExecutionState.h"
 #include "klee/Statistics.h"
@@ -45,7 +46,9 @@
 #include <fstream>
 #include <climits>
 #include <iostream>
+#include <list>
 #include <string>
+#include <utility>
 
 using namespace klee;
 using namespace llvm;
@@ -164,65 +167,74 @@ RandomSearcher::update(ExecutionState *current,
   }
 }
 
-TargetedSearcher::TargetedSearcher(std::string _target_file, unsigned int _target_line) {
+uint LeastDecisions2TargetSearcher::countFutureDecisions2Target(
+        ExecutionState *current) {
+    // Extract starting instruction
+    llvm::Instruction* start = current->pc->inst;
 
-    target_file = _target_file;
-    target_line = _target_line;
-}
-
-/*
-TargetedSearcher::~TargetedSearcher() {
-    delete target;
-}
-*/
-
-unsigned int TargetedSearcher::shortestDistance(ExecutionState *current) {
-    int diff = int(target_line) - int(current->pc->info->line);
-    if (diff<0)
-        return UINT_MAX;
-    
-    if (current->pc->info->file == target_file) {
-        return diff;
+    // Build the stack
+    std::list<llvm::Instruction*> stack;
+    // Skip the first entry, cause it got no caller
+    for (std::vector<klee::StackFrame>::iterator it = (++current->stack.begin());
+            it != current->stack.end(); it++) {
+        stack.push_back(it->caller->inst);
     }
-    return UINT_MAX;
+
+    // Start the search and return its result
+    Decisions2TargetCallSearcher s(start, stack, target);
+    return s.searchForMinimalDistance();
 }
 
-ExecutionState &TargetedSearcher::selectState() {
-    unsigned int foundShortestDistance = UINT_MAX;
-    unsigned int foundShortestDistanceStateIndex = 0;
-    for (unsigned int i=0; i<states.size(); i++) {
-        unsigned int curShortestDistance = shortestDistance(states[i]);
-        if (curShortestDistance < foundShortestDistance) {
-            foundShortestDistance = curShortestDistance;
-            foundShortestDistanceStateIndex = i;
+ExecutionState &LeastDecisions2TargetSearcher::selectState() {
+    return *(storage.lower_bound(0)->second);
+}
+
+void LeastDecisions2TargetSearcher::update(ExecutionState *current,
+        const std::set<ExecutionState*> &addedStates,
+        const std::set<ExecutionState*> &removedStates) {
+    // Internal counter for the number of states already deleted
+    uint deletedcounter = 0;
+
+    // Delete all removed States
+    for(std::multimap<uint, ExecutionState*>::iterator it = storage.begin();
+            it != storage.end(); ) {
+
+        // Only iterate, till there is nothing more to be removed
+        if (deletedcounter == removedStates.size()) {
+            break;
+        }
+
+        // Test, if the current element is listed to be removed
+        std::set<ExecutionState*>::iterator search = removedStates.find(it->second);
+
+        if (search != removedStates.end()) {
+            // Erase it in the storage
+            it = storage.erase(it);
+            // And increase the deletion counter
+            deletedcounter++;
+        } else {
+            // Otherwise just skip this element
+            ++it;
         }
     }
 
-    return *states[foundShortestDistanceStateIndex];
-}
+    // Add all relevant states
+    for (std::set<ExecutionState*>::iterator it = addedStates.begin();
+            it != addedStates.end(); it++) {
+        uint minfutureDecisions = countFutureDecisions2Target(*it);
 
-void TargetedSearcher::update(ExecutionState *current,
-        const std::set<ExecutionState*> &addedStates,
-        const std::set<ExecutionState*> &removedStates) {
-  states.insert(states.end(),
-                addedStates.begin(),
-                addedStates.end());
-  for (std::set<ExecutionState*>::const_iterator it = removedStates.begin(),
-         ie = removedStates.end(); it != ie; ++it) {
-    ExecutionState *es = *it;
-    bool ok = false;
-
-    for (std::vector<ExecutionState*>::iterator it = states.begin(),
-           ie = states.end(); it != ie; ++it) {
-      if (es==*it) {
-        states.erase(it);
-        ok = true;
-        break;
-      }
+        if (minfutureDecisions == UINT_MAX) {
+            // If number of future decisions is already maximal
+            // do not add anything to it - avoids overflows
+            storage.insert(std::make_pair(minfutureDecisions, *it));
+            // Set forking counter close to maximum to stop further execution
+            // of states, that cannot reach the target
+            (*it)->depth = UINT_MAX - 1;
+        } else {
+            // Total decisions = previous decisions + future decisions
+            storage.insert(std::make_pair((*it)->depth + minfutureDecisions, *it));
+        }
     }
-    
-    assert(ok && "invalid state removed");
-  }
 }
 
 ///
