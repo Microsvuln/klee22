@@ -209,7 +209,14 @@ void LeastDecisions2TargetSearcher::update(ExecutionState *current,
 
         if (search != removedStates.end()) {
             // Erase it in the storage
-            it = storage.erase(it);
+
+            // This is a little bit complicated before c++11
+            // There `it = storage.erase(it);` would be enough
+            // But for older c++ we need a second iterator
+            std::multimap<uint, ExecutionState*>::iterator old = it;
+            ++it;
+            storage.erase(old);
+
             // And increase the deletion counter
             deletedcounter++;
         } else {
