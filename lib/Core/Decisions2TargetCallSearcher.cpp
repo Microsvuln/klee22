@@ -8,6 +8,12 @@ bool Decisions2TargetCallSearcher::isTheTarget(BFSearchState state) {
     // Extract the called function
     llvm::CallInst* call = llvm::cast<llvm::CallInst>(state.instruction);
     llvm::Function* called = call->getCalledFunction();
+
+    // Check, if the called function actually exists
+    if (called == NULL) {
+      return false;
+    }
+
     // Check, if it calls our target or one of the klee internals used
     // be the prepend error modification to actually check for these errors
     return called->getName().str() == this->targetFunctionName ||
