@@ -14,11 +14,21 @@ bool Decisions2TargetCallSearcher::isTheTarget(BFSearchState state) {
       return false;
     }
 
-    // Check, if it calls our target or one of the klee internals used
-    // be the prepend error modification to actually check for these errors
-    return called->getName().str() == this->targetFunctionName ||
-           called->getName() == "klee_silent_exit" ||
-           called->getName() == "klee_report_error";
+    // Check, if it calls our target
+    if (called->getName().str() == this->targetFunctionName) {
+      return true;
+    }
+
+    // Check, if it calls one of the klee internals used for the prepend error
+    // modification to actually check for these errors
+    if (called->getName().str() ==
+        "__macke_error_" + this->targetFunctionName) {
+      if (called->getName() == "klee_silent_exit" ||
+          called->getName() == "klee_report_error") {
+        return true;
+      }
+    }
+
   }
   return false;
 }
