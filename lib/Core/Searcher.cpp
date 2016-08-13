@@ -234,9 +234,8 @@ void LeastDecisions2TargetSearcher::update(ExecutionState *current,
             // If number of future decisions is already maximal
             // do not add anything to it - avoids overflows
             storage.insert(std::make_pair(minfutureDecisions, *it));
-            // Set forking counter close to maximum to stop further execution
-            // of states, that cannot reach the target
-            (*it)->depth = UINT_MAX - 1;
+            // stop further execution of states, that cannot reach the target
+            executor.terminateState(**it);
         } else {
             // Total decisions = previous decisions + future decisions
             storage.insert(std::make_pair((*it)->depth + minfutureDecisions, *it));

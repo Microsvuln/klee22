@@ -100,7 +100,7 @@ Searcher *getNewSearcher(Searcher::CoreSearchType type, Executor &executor) {
       llvm::errs() << " please add --targeted-function=... to your parameters\n";
       exit(1);
     }
-    searcher = new LeastDecisions2TargetSearcher(TargetedFunctionName);
+    searcher = new LeastDecisions2TargetSearcher(executor, TargetedFunctionName);
     break;
   }
 
