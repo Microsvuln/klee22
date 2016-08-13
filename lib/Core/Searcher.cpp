@@ -186,7 +186,16 @@ uint LeastDecisions2TargetSearcher::countFutureDecisions2Target(
 }
 
 ExecutionState &LeastDecisions2TargetSearcher::selectState() {
-    return *(storage.lower_bound(0)->second);
+
+    std::multimap<unsigned int, klee::ExecutionState*>::iterator next =
+      storage.lower_bound(0);
+
+    if (next->first == UINT_MAX) {
+      // stop further execution of states, that cannot reach the target
+      executor.terminateState(*(next->second));
+    }
+
+    return *(next->second);
 }
 
 void LeastDecisions2TargetSearcher::update(ExecutionState *current,
@@ -234,8 +243,6 @@ void LeastDecisions2TargetSearcher::update(ExecutionState *current,
             // If number of future decisions is already maximal
             // do not add anything to it - avoids overflows
             storage.insert(std::make_pair(minfutureDecisions, *it));
-            // stop further execution of states, that cannot reach the target
-            executor.terminateState(**it);
         } else {
             // Total decisions = previous decisions + future decisions
             storage.insert(std::make_pair((*it)->depth + minfutureDecisions, *it));
