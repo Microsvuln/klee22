@@ -9,7 +9,7 @@ bool Decisions2TargetCallSearcher::isTheTarget(BFSearchState state) {
     llvm::CallInst* call = llvm::cast<llvm::CallInst>(state.instruction);
     llvm::Function* called = call->getCalledFunction();
 
-    // Check, if the called function actually exists
+    // Check, if a value i.e. a pointer to a function is called
     if (called == NULL) {
       return false;
     }
@@ -17,19 +17,6 @@ bool Decisions2TargetCallSearcher::isTheTarget(BFSearchState state) {
     // Check, if it calls our target
     if (called->getName().str() == this->targetFunctionName) {
       return true;
-    }
-
-    // Check, if it calls one of the klee internals used for the prepend error
-    // modification to actually check for these errors
-    if (!state.stack.empty()) {
-      llvm::Function* parent = state.stack.top().call->getParent()->getParent();
-      if (parent != NULL &&
-          parent->getName() == "__macke_error_" + this->targetFunctionName) {
-        if (called->getName() == "klee_silent_exit" ||
-            called->getName() == "klee_report_error") {
-          return true;
-        }
-      }
     }
   }
   return false;

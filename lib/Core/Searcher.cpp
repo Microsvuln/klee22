@@ -191,8 +191,14 @@ ExecutionState &LeastDecisions2TargetSearcher::selectState() {
       storage.lower_bound(0);
 
     if (next->first == UINT_MAX) {
-      // stop further execution of states, that cannot reach the target
-      executor.terminateState(*(next->second));
+      Function* parent = next->second->pc->inst->getParent()->getParent();
+      // MACKE's own functions for checking errors should not be terminated
+      if (parent == NULL ||
+          strncmp(parent->getName().data(), "__macke_", strlen("__macke_")) !=
+              0) {
+        // stop further execution of states, that cannot reach the target
+        executor.terminateState(*(next->second));
+      }
     }
 
     return *(next->second);
