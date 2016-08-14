@@ -14,6 +14,13 @@ bool Decisions2TargetCallSearcher::isTheTarget(BFSearchState state) {
       return false;
     }
 
+    // Call instructions inside the macke error encapsulation of the target are
+    // also target. Thereby, error checks are executed earlier.
+    if (state.instruction->getParent()->getParent()->getName().str() ==
+        "__macke_error_" + this->targetFunctionName) {
+      return true;
+    }
+
     // Check, if it calls our target
     if (called->getName().str() == this->targetFunctionName) {
       return true;
