@@ -13,6 +13,7 @@
 #include "Executor.h"
 #include "PTree.h"
 #include "StatsTracker.h"
+#include "Decisions2TargetCallSearcher.h"
 
 #include "klee/ExecutionState.h"
 #include "klee/Statistics.h"
@@ -44,6 +45,10 @@
 #include <cassert>
 #include <fstream>
 #include <climits>
+#include <iostream>
+#include <list>
+#include <string>
+#include <utility>
 
 using namespace klee;
 using namespace llvm;
@@ -156,6 +161,95 @@ void RandomSearcher::update(ExecutionState *current,
     
     assert(ok && "invalid state removed");
   }
+}
+
+uint LeastDecisions2TargetSearcher::countFutureDecisions2Target(
+        ExecutionState *current) {
+    // Extract starting instruction
+    llvm::Instruction* start = current->pc->inst;
+
+    // Build the stack
+    std::list<llvm::Instruction*> stack;
+    // Skip the first entry, cause it got no caller
+    for (std::vector<klee::StackFrame>::iterator it = (++current->stack.begin());
+            it != current->stack.end(); it++) {
+        stack.push_back(it->caller->inst);
+    }
+
+    // Start the search and return its result
+    Decisions2TargetCallSearcher s(start, stack, target);
+    return s.searchForMinimalDistance();
+}
+
+ExecutionState &LeastDecisions2TargetSearcher::selectState() {
+
+    std::multimap<unsigned int, klee::ExecutionState*>::iterator next =
+      storage.lower_bound(0);
+
+    if (next->first == UINT_MAX) {
+      Function* parent = next->second->pc->inst->getParent()->getParent();
+      // MACKE's own functions for checking errors should not be terminated
+      if (parent == NULL ||
+          strncmp(parent->getName().data(), "__macke_", strlen("__macke_")) !=
+              0) {
+        // stop further execution of states, that cannot reach the target
+        executor.terminateState(*(next->second));
+      }
+    }
+
+    return *(next->second);
+}
+
+void LeastDecisions2TargetSearcher::update(ExecutionState *current,
+        const std::set<ExecutionState*> &addedStates,
+        const std::set<ExecutionState*> &removedStates) {
+    // Internal counter for the number of states already deleted
+    uint deletedcounter = 0;
+
+    // Delete all removed States
+    for(std::multimap<uint, ExecutionState*>::iterator it = storage.begin();
+            it != storage.end(); ) {
+
+        // Only iterate, till there is nothing more to be removed
+        if (deletedcounter == removedStates.size()) {
+            break;
+        }
+
+        // Test, if the current element is listed to be removed
+        std::set<ExecutionState*>::iterator search = removedStates.find(it->second);
+
+        if (search != removedStates.end()) {
+            // Erase it in the storage
+
+            // This is a little bit complicated before c++11
+            // There `it = storage.erase(it);` would be enough
+            // But for older c++ we need a second iterator
+            std::multimap<uint, ExecutionState*>::iterator old = it;
+            ++it;
+            storage.erase(old);
+
+            // And increase the deletion counter
+            deletedcounter++;
+        } else {
+            // Otherwise just skip this element
+            ++it;
+        }
+    }
+
+    // Add all relevant states
+    for (std::set<ExecutionState*>::iterator it = addedStates.begin();
+            it != addedStates.end(); it++) {
+        uint minfutureDecisions = countFutureDecisions2Target(*it);
+
+        if (minfutureDecisions == UINT_MAX) {
+            // If number of future decisions is already maximal
+            // do not add anything to it - avoids overflows
+            storage.insert(std::make_pair(minfutureDecisions, *it));
+        } else {
+            // Total decisions = previous decisions + future decisions
+            storage.insert(std::make_pair((*it)->depth + minfutureDecisions, *it));
+        }
+    }
 }
 
 ///

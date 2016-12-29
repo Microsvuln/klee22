@@ -15,6 +15,7 @@
 #include <set>
 #include <map>
 #include <queue>
+#include <string>
 
 namespace llvm {
   class BasicBlock;
@@ -76,7 +77,8 @@ namespace klee {
       NURS_Depth,
       NURS_ICnt,
       NURS_CPICnt,
-      NURS_QC
+      NURS_QC,
+      LD2T
     };
   };
 
@@ -120,6 +122,27 @@ namespace klee {
     void printName(llvm::raw_ostream &os) {
       os << "RandomSearcher\n";
     }
+  };
+
+  class LeastDecisions2TargetSearcher : public Searcher {
+    Executor &executor;
+    std::string target;
+    std::multimap<uint, ExecutionState*> storage;
+
+  public:
+    LeastDecisions2TargetSearcher(Executor &_executor, std::string _target) :
+                                  executor(_executor), target(_target) {
+                                  /* emtpty */};
+    ExecutionState &selectState();
+    void update(ExecutionState *current,
+                const std::set<ExecutionState*> &addedStates,
+                const std::set<ExecutionState*> &removedStates);
+    bool empty() { return storage.empty(); }
+    void printName(llvm::raw_ostream &os) {
+      os << "LeastDecisions2TargetSearcher\n";
+    }
+  private:
+    uint countFutureDecisions2Target(ExecutionState* state);
   };
 
   class WeightedRandomSearcher : public Searcher {

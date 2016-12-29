@@ -83,6 +83,7 @@ class Executor : public Interpreter {
   friend class BumpMergingSearcher;
   friend class MergingSearcher;
   friend class RandomPathSearcher;
+  friend class LeastDecisions2TargetSearcher;
   friend class OwningSearcher;
   friend class WeightedRandomSearcher;
   friend class SpecialFunctionHandler;

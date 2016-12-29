@@ -14,6 +14,7 @@
 
 #include "klee/Internal/Support/ErrorHandling.h"
 #include "llvm/Support/CommandLine.h"
+#include <string>
 
 using namespace llvm;
 using namespace klee;
@@ -31,6 +32,7 @@ namespace {
 			clEnumValN(Searcher::NURS_ICnt, "nurs:icnt", "use NURS with Instr-Count"),
 			clEnumValN(Searcher::NURS_CPICnt, "nurs:cpicnt", "use NURS with CallPath-Instr-Count"),
 			clEnumValN(Searcher::NURS_QC, "nurs:qc", "use NURS with Query-Cost"),
+			clEnumValN(Searcher::LD2T, "ld2t", "use least decisions to target function call"),
 			clEnumValEnd));
 
   cl::opt<bool>
@@ -61,6 +63,11 @@ namespace {
   UseBumpMerge("use-bump-merge", 
            cl::desc("Enable support for klee_merge() (extra experimental)"));
 
+  cl::opt<std::string>
+  TargetedFunctionName("targeted-function",
+                    cl::desc("Name of the function, that should be reached"),
+                    cl::init("-"));
+
 }
 
 
@@ -86,6 +93,15 @@ Searcher *getNewSearcher(Searcher::CoreSearchType type, Executor &executor) {
   case Searcher::NURS_ICnt: searcher = new WeightedRandomSearcher(WeightedRandomSearcher::InstCount); break;
   case Searcher::NURS_CPICnt: searcher = new WeightedRandomSearcher(WeightedRandomSearcher::CPInstCount); break;
   case Searcher::NURS_QC: searcher = new WeightedRandomSearcher(WeightedRandomSearcher::QueryCost); break;
+  case Searcher::LD2T:
+    // Check for valid information for the function name
+    if (TargetedFunctionName == "-") {
+      llvm::errs() << "LD2T is missing target information \n";
+      llvm::errs() << " please add --targeted-function=... to your parameters\n";
+      exit(1);
+    }
+    searcher = new LeastDecisions2TargetSearcher(executor, TargetedFunctionName);
+    break;
   }
 
   return searcher;

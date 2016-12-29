@@ -30,6 +30,14 @@
 #endif
 #include "llvm/ADT/Twine.h"
 
+#if LLVM_VERSION_CODE <= LLVM_VERSION(3, 1)
+#include "llvm/Target/TargetData.h"
+#elif LLVM_VERSION_CODE <= LLVM_VERSION(3, 2)
+#include "llvm/DataLayout.h"
+#else
+#include "llvm/IR/DataLayout.h"
+#endif
+
 #include <errno.h>
 
 using namespace llvm;
@@ -534,12 +542,23 @@ void SpecialFunctionHandler::handleGetObjSize(ExecutionState &state,
   // XXX should type check args
   assert(arguments.size()==1 &&
          "invalid number of arguments to klee_get_obj_size");
-  Executor::ExactResolutionList rl;
-  executor.resolveExact(state, arguments[0], rl, "klee_get_obj_size");
-  for (Executor::ExactResolutionList::iterator it = rl.begin(), 
-         ie = rl.end(); it != ie; ++it) {
-    executor.bindLocal(target, *it->second, 
-                       ConstantExpr::create(it->first.first->size, Expr::Int32));
+
+  if (arguments[0]->isZero()) {
+    // NULL has size 0
+    executor.bindLocal(target, state,
+      ConstantExpr::create(0, executor.kmodule->targetData->getTypeSizeInBits(
+                                target->inst->getType())));
+  } else {
+    Executor::ExactResolutionList rl;
+    executor.resolveExact(state, arguments[0], rl, "klee_get_obj_size");
+    for (Executor::ExactResolutionList::iterator it = rl.begin(),
+           ie = rl.end(); it != ie; ++it) {
+      executor.bindLocal(
+          target, *it->second,
+          ConstantExpr::create(it->first.first->size,
+                               executor.kmodule->targetData->getTypeSizeInBits(
+                                   target->inst->getType())));
+    }
   }
 }
 
