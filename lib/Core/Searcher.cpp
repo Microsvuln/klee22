@@ -42,6 +42,7 @@
 #include "llvm/IR/CallSite.h"
 #endif
 
+#include <algorithm>
 #include <cassert>
 #include <fstream>
 #include <climits>
@@ -205,8 +206,8 @@ ExecutionState &LeastDecisions2TargetSearcher::selectState() {
 }
 
 void LeastDecisions2TargetSearcher::update(ExecutionState *current,
-        const std::set<ExecutionState*> &addedStates,
-        const std::set<ExecutionState*> &removedStates) {
+        const std::vector<ExecutionState*> &addedStates,
+        const std::vector<ExecutionState*> &removedStates) {
     // Internal counter for the number of states already deleted
     uint deletedcounter = 0;
 
@@ -220,9 +221,7 @@ void LeastDecisions2TargetSearcher::update(ExecutionState *current,
         }
 
         // Test, if the current element is listed to be removed
-        std::set<ExecutionState*>::iterator search = removedStates.find(it->second);
-
-        if (search != removedStates.end()) {
+        if (std::find(removedStates.begin(), removedStates.end(), it->second) != removedStates.end()) {
             // Erase it in the storage
 
             // This is a little bit complicated before c++11
@@ -241,7 +240,7 @@ void LeastDecisions2TargetSearcher::update(ExecutionState *current,
     }
 
     // Add all relevant states
-    for (std::set<ExecutionState*>::iterator it = addedStates.begin();
+    for (std::vector<ExecutionState*>::const_iterator it = addedStates.begin();
             it != addedStates.end(); it++) {
         uint minfutureDecisions = countFutureDecisions2Target(*it);
 

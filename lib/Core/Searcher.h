@@ -135,8 +135,8 @@ namespace klee {
                                   /* emtpty */};
     ExecutionState &selectState();
     void update(ExecutionState *current,
-                const std::set<ExecutionState*> &addedStates,
-                const std::set<ExecutionState*> &removedStates);
+                const std::vector<ExecutionState*> &addedStates,
+                const std::vector<ExecutionState*> &removedStates);
     bool empty() { return storage.empty(); }
     void printName(llvm::raw_ostream &os) {
       os << "LeastDecisions2TargetSearcher\n";
