@@ -25,7 +25,7 @@
 #include "CoreStats.h"
 #include "Executor.h"
 #include "MemoryManager.h"
-#include "UserSearcher.h"
+#include "../Search/UserSearcher.h"
 
 #if LLVM_VERSION_CODE > LLVM_VERSION(3, 2)
 #include "llvm/IR/BasicBlock.h"

@@ -9,10 +9,10 @@
 
 #include "Searcher.h"
 
-#include "CoreStats.h"
-#include "Executor.h"
-#include "PTree.h"
-#include "StatsTracker.h"
+#include "../Core/CoreStats.h"
+#include "../Core/Executor.h"
+#include "../Core/PTree.h"
+#include "../Core/StatsTracker.h"
 
 #include "klee/ExecutionState.h"
 #include "klee/Statistics.h"

@@ -15,12 +15,12 @@
 #include "Memory.h"
 #include "MemoryManager.h"
 #include "PTree.h"
-#include "Searcher.h"
+#include "../Search/Searcher.h"
 #include "SeedInfo.h"
 #include "SpecialFunctionHandler.h"
 #include "StatsTracker.h"
 #include "TimingSolver.h"
-#include "UserSearcher.h"
+#include "../Search/UserSearcher.h"
 #include "ExecutorTimerInfo.h"
 
 
