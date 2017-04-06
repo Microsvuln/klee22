@@ -303,21 +303,17 @@ void LeastDecisions2TargetSearcher::update(ExecutionState *current,
     std::vector<ExecutionState*> updatedAddedStates;
     std::vector<ExecutionState*> updatedRemovedStates;
 
-    for (std::vector<ExecutionState*>::const_iterator it = addedStates.begin();
-            it != addedStates.end(); it++) {
-      llvm::errs() << "FLAG : " << *it << "\n";
-      // if(it->targetFunc)
-      //   updatedAddedStates.push_back(*it);
+    for(std::vector<int>::size_type i = 0; i != addedStates.size(); i++) {
+        if(addedStates[i]->targetFunc)
+            updatedAddedStates.push_back(addedStates[i]);
     }
 
-    // for (std::vector<ExecutionState*>::const_iterator it = removedStates.begin();
-    //         it != removedStates.end(); it++) {
-    //   if(it->targetFunc)
-    //     updatedRemovedStates.push_back(*it);
-    // }
+    for(std::vector<int>::size_type i = 0; i != removedStates.size(); i++) {
+        if(removedStates[i]->targetFunc)
+            updatedRemovedStates.push_back(addedStates[i]);
+    }
 
-    // this->nestedSearcher.update(current, updatedAddedStates, updatedRemovedStates);
-    this->nestedSearcher.update(current, addedStates, removedStates);
+    this->nestedSearcher.update(current, updatedAddedStates, updatedRemovedStates);
 
     // Internal counter for the number of states already deleted
     uint deletedcounter = 0;
