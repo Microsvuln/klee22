@@ -6,7 +6,6 @@
 
 class Decisions2TargetCallSearcher : public BFSearcher {
  private:
-  std::string targetFunctionName;
   static const uint maxDistance = 100;
 
   /**
@@ -21,6 +20,7 @@ class Decisions2TargetCallSearcher : public BFSearcher {
   uint distanceToPass(llvm::Instruction* instr);
 
  public:
+  std::string targetFunctionName;
   Decisions2TargetCallSearcher(llvm::Instruction* start,
                                std::string _targetFunctionName)
       : BFSearcher(start), targetFunctionName(_targetFunctionName) { /* empty */

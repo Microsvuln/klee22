@@ -32,6 +32,8 @@
 #include <set>
 #include <stdarg.h>
 
+#include "klee/TargetFunc.h"
+
 using namespace llvm;
 using namespace klee;
 
@@ -67,6 +69,8 @@ StackFrame::~StackFrame() {
 /***/
 
 ExecutionState::ExecutionState(KFunction *kf) :
+    targetFunc(false),
+    
     pc(kf->instructions),
     prevPC(pc),
 
@@ -98,6 +102,8 @@ ExecutionState::~ExecutionState() {
 }
 
 ExecutionState::ExecutionState(const ExecutionState& state):
+    targetFunc(state.targetFunc),
+
     fnAliases(state.fnAliases),
     pc(state.pc),
     prevPC(state.prevPC),
@@ -130,6 +136,9 @@ ExecutionState *ExecutionState::branch() {
   depth++;
 
   ExecutionState *falseState = new ExecutionState(*this);
+
+  falseState->targetFunc = false;
+
   falseState->coveredNew = false;
   falseState->coveredLines.clear();
 
@@ -140,6 +149,9 @@ ExecutionState *ExecutionState::branch() {
 }
 
 void ExecutionState::pushFrame(KInstIterator caller, KFunction *kf) {
+  if(kf->function->getName().equals(targFuncName)) {
+    targetFunc = true;
+  }
   stack.push_back(StackFrame(caller,kf));
 }
 
@@ -191,6 +203,11 @@ bool ExecutionState::merge(const ExecutionState &b) {
   if (DebugLogStateMerge)
     llvm::errs() << "-- attempting merge of A:" << this << " with B:" << &b
                  << "--\n";
+
+  if(targetFunc != b.targetFunc) {
+    return false;
+  }
+
   if (pc != b.pc)
     return false;
 

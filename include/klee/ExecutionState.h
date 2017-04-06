@@ -73,6 +73,10 @@ private:
   std::map<std::string, std::string> fnAliases;
 
 public:
+
+  // addFlag to check if the target function was pushed on the stack
+  bool targetFunc;
+
   // Execution - Control Flow specific
 
   /// @brief Pointer to instruction to be executed after the current

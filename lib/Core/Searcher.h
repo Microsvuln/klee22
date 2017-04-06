@@ -124,27 +124,6 @@ namespace klee {
     }
   };
 
-  class LeastDecisions2TargetSearcher : public Searcher {
-    Executor &executor;
-    std::string target;
-    std::multimap<uint, ExecutionState*> storage;
-
-  public:
-    LeastDecisions2TargetSearcher(Executor &_executor, std::string _target) :
-                                  executor(_executor), target(_target) {
-                                  /* emtpty */};
-    ExecutionState &selectState();
-    void update(ExecutionState *current,
-                const std::vector<ExecutionState*> &addedStates,
-                const std::vector<ExecutionState*> &removedStates);
-    bool empty() { return storage.empty(); }
-    void printName(llvm::raw_ostream &os) {
-      os << "LeastDecisions2TargetSearcher\n";
-    }
-  private:
-    uint countFutureDecisions2Target(ExecutionState* state);
-  };
-
   class WeightedRandomSearcher : public Searcher {
   public:
     enum WeightType {
@@ -184,6 +163,31 @@ namespace klee {
       default                 : os << "<unknown type>\n"; return;
       }
     }
+  };
+  
+  class LeastDecisions2TargetSearcher : public Searcher {
+    Executor &executor;
+    std::multimap<uint, ExecutionState*> storage;
+
+  public:
+    LeastDecisions2TargetSearcher(Executor &_executor, std::string _target) :
+                                  executor(_executor), target(_target), nestedSearcher(WeightedRandomSearcher::CoveringNew) {
+                                  /* emtpty */};
+    ExecutionState &selectState();
+    void update(ExecutionState *current,
+                const std::vector<ExecutionState*> &addedStates,
+                const std::vector<ExecutionState*> &removedStates);
+    bool empty() { return storage.empty(); }
+    void printName(llvm::raw_ostream &os) {
+      os << "LeastDecisions2TargetSearcher\n";
+    }
+
+    // nested searcher
+    std::string target;
+    WeightedRandomSearcher nestedSearcher;
+
+  private:
+    uint countFutureDecisions2Target(ExecutionState* state);
   };
 
   class RandomPathSearcher : public Searcher {

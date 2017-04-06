@@ -168,93 +168,6 @@ RandomSearcher::update(ExecutionState *current,
   }
 }
 
-uint LeastDecisions2TargetSearcher::countFutureDecisions2Target(
-        ExecutionState *current) {
-    // Extract starting instruction
-    llvm::Instruction* start = current->pc->inst;
-
-    // Build the stack
-    std::list<llvm::Instruction*> stack;
-    // Skip the first entry, cause it got no caller
-    for (std::vector<klee::StackFrame>::iterator it = (++current->stack.begin());
-            it != current->stack.end(); it++) {
-        stack.push_back(it->caller->inst);
-    }
-
-    // Start the search and return its result
-    Decisions2TargetCallSearcher s(start, stack, target);
-    return s.searchForMinimalDistance();
-}
-
-ExecutionState &LeastDecisions2TargetSearcher::selectState() {
-
-    std::multimap<unsigned int, klee::ExecutionState*>::iterator next =
-      storage.lower_bound(0);
-
-    if (next->first == UINT_MAX) {
-      Function* parent = next->second->pc->inst->getParent()->getParent();
-      // MACKE's own functions for checking errors should not be terminated
-      if (parent == NULL ||
-          strncmp(parent->getName().data(), "__macke_", strlen("__macke_")) !=
-              0) {
-        // stop further execution of states, that cannot reach the target
-        executor.terminateState(*(next->second));
-      }
-    }
-
-    return *(next->second);
-}
-
-void LeastDecisions2TargetSearcher::update(ExecutionState *current,
-        const std::vector<ExecutionState*> &addedStates,
-        const std::vector<ExecutionState*> &removedStates) {
-    // Internal counter for the number of states already deleted
-    uint deletedcounter = 0;
-
-    // Delete all removed States
-    for(std::multimap<uint, ExecutionState*>::iterator it = storage.begin();
-            it != storage.end(); ) {
-
-        // Only iterate, till there is nothing more to be removed
-        if (deletedcounter == removedStates.size()) {
-            break;
-        }
-
-        // Test, if the current element is listed to be removed
-        if (std::find(removedStates.begin(), removedStates.end(), it->second) != removedStates.end()) {
-            // Erase it in the storage
-
-            // This is a little bit complicated before c++11
-            // There `it = storage.erase(it);` would be enough
-            // But for older c++ we need a second iterator
-            std::multimap<uint, ExecutionState*>::iterator old = it;
-            ++it;
-            storage.erase(old);
-
-            // And increase the deletion counter
-            deletedcounter++;
-        } else {
-            // Otherwise just skip this element
-            ++it;
-        }
-    }
-
-    // Add all relevant states
-    for (std::vector<ExecutionState*>::const_iterator it = addedStates.begin();
-            it != addedStates.end(); it++) {
-        uint minfutureDecisions = countFutureDecisions2Target(*it);
-
-        if (minfutureDecisions == UINT_MAX) {
-            // If number of future decisions is already maximal
-            // do not add anything to it - avoids overflows
-            storage.insert(std::make_pair(minfutureDecisions, *it));
-        } else {
-            // Total decisions = previous decisions + future decisions
-            storage.insert(std::make_pair((*it)->depth + minfutureDecisions, *it));
-        }
-    }
-}
-
 ///
 
 WeightedRandomSearcher::WeightedRandomSearcher(WeightType _type)
@@ -345,6 +258,112 @@ void WeightedRandomSearcher::update(
 
 bool WeightedRandomSearcher::empty() { 
   return states->empty(); 
+}
+
+///
+
+uint LeastDecisions2TargetSearcher::countFutureDecisions2Target(
+        ExecutionState *current) {
+    // Extract starting instruction
+    llvm::Instruction* start = current->pc->inst;
+
+    // Build the stack
+    std::list<llvm::Instruction*> stack;
+    // Skip the first entry, cause it got no caller
+    for (std::vector<klee::StackFrame>::iterator it = (++current->stack.begin());
+            it != current->stack.end(); it++) {
+        stack.push_back(it->caller->inst);
+    }
+
+    // Start the search and return its result
+    Decisions2TargetCallSearcher s(start, stack, target);
+    return s.searchForMinimalDistance();
+}
+
+ExecutionState &LeastDecisions2TargetSearcher::selectState() {
+
+  if (!this->nestedSearcher.empty()) {
+    return this->nestedSearcher.selectState();
+  }
+  else {
+    std::multimap<unsigned int, klee::ExecutionState*>::iterator next = 
+      storage.lower_bound(0);
+    if(next->first == UINT_MAX) {
+      executor.terminateState(*(next->second));
+    }
+    return *(next->second);
+  }
+}
+
+void LeastDecisions2TargetSearcher::update(ExecutionState *current,
+        const std::vector<ExecutionState*> &addedStates,
+        const std::vector<ExecutionState*> &removedStates) {
+
+    // keep only the states that are below my target
+    std::vector<ExecutionState*> updatedAddedStates;
+    std::vector<ExecutionState*> updatedRemovedStates;
+
+    for (std::vector<ExecutionState*>::const_iterator it = addedStates.begin();
+            it != addedStates.end(); it++) {
+      llvm::errs() << "FLAG : " << *it << "\n";
+      // if(it->targetFunc)
+      //   updatedAddedStates.push_back(*it);
+    }
+
+    // for (std::vector<ExecutionState*>::const_iterator it = removedStates.begin();
+    //         it != removedStates.end(); it++) {
+    //   if(it->targetFunc)
+    //     updatedRemovedStates.push_back(*it);
+    // }
+
+    // this->nestedSearcher.update(current, updatedAddedStates, updatedRemovedStates);
+    this->nestedSearcher.update(current, addedStates, removedStates);
+
+    // Internal counter for the number of states already deleted
+    uint deletedcounter = 0;
+
+    // Delete all removed States
+    for(std::multimap<uint, ExecutionState*>::iterator it = storage.begin();
+            it != storage.end(); ) {
+
+        // Only iterate, till there is nothing more to be removed
+        if (deletedcounter == removedStates.size()) {
+            break;
+        }
+
+        // Test, if the current element is listed to be removed
+        if (std::find(removedStates.begin(), removedStates.end(), it->second) != removedStates.end()) {
+            // Erase it in the storage
+
+            // This is a little bit complicated before c++11
+            // There `it = storage.erase(it);` would be enough
+            // But for older c++ we need a second iterator
+            std::multimap<uint, ExecutionState*>::iterator old = it;
+            ++it;
+            storage.erase(old);
+
+            // And increase the deletion counter
+            deletedcounter++;
+        } else {
+            // Otherwise just skip this element
+            ++it;
+        }
+    }
+
+    // Add all relevant states
+    for (std::vector<ExecutionState*>::const_iterator it = addedStates.begin();
+            it != addedStates.end(); it++) {
+        uint minfutureDecisions = countFutureDecisions2Target(*it);
+
+        if (minfutureDecisions == UINT_MAX) {
+            // If number of future decisions is already maximal
+            // do not add anything to it - avoids overflows
+            storage.insert(std::make_pair(minfutureDecisions, *it));
+        } else {
+            // Total decisions = previous decisions + future decisions
+            storage.insert(std::make_pair((*it)->depth + minfutureDecisions, *it));
+        }
+    }
 }
 
 ///

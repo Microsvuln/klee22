@@ -16,8 +16,13 @@
 #include "llvm/Support/CommandLine.h"
 #include <string>
 
+#include "klee/TargetFunc.h"
+
 using namespace llvm;
 using namespace klee;
+
+
+std::string targFuncName;
 
 namespace {
   cl::list<Searcher::CoreSearchType>
@@ -97,9 +102,10 @@ Searcher *getNewSearcher(Searcher::CoreSearchType type, Executor &executor) {
     // Check for valid information for the function name
     if (TargetedFunctionName == "-") {
       llvm::errs() << "LD2T is missing target information \n";
-      llvm::errs() << " please add --targeted-function=... to your parameters\n";
+      llvm::errs() << " please add -targeted-function=... to your parameters\n";
       exit(1);
     }
+    targFuncName = TargetedFunctionName;
     searcher = new LeastDecisions2TargetSearcher(executor, TargetedFunctionName);
     break;
   }
