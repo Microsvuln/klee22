@@ -1,0 +1,1 @@
+A stand alone version without any KLEE dependency of this search strategy can be find in a [seperate github repository](https://github.com/hutoTUM/TargetedSearchStandalone).

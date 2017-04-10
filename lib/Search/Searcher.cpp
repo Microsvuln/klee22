@@ -9,6 +9,8 @@
 
 #include "Searcher.h"
 
+#include "./Dijkstra/Dijkstra.h"
+
 #include "../Core/CoreStats.h"
 #include "../Core/Executor.h"
 #include "../Core/PTree.h"
@@ -293,6 +295,126 @@ RandomPathSearcher::update(ExecutionState *current,
 
 bool RandomPathSearcher::empty() { 
   return executor.states.empty(); 
+}
+
+///
+
+ExecutionState &DijkstraSearcher::selectState() {
+  // Get the state with the shortest distance
+  std::multimap<unsigned int, klee::ExecutionState *>::iterator next =
+      distanceStore.lower_bound(0);
+
+  // if requested, stop further execution of states that cannot reach the target
+  if (!this->continueUnreachable && next->first == UINT_MAX) {
+    executor.terminateState(*(next->second));
+  }
+
+  return *(next->second);
+}
+
+DijkstraSearcher::DijkstraSearcher(Executor &_executor,
+                                   DijkstraSearcher::Distance distance,
+                                   DijkstraSearcher::Target target,
+                                   llvm::StringRef info,
+                                   bool _continueUnreachable)
+    : executor(_executor), continueUnreachable(_continueUnreachable) {
+  switch (distance) {
+  case Decisions:
+    this->stratDistance = new CountDecisions();
+    break;
+  case Instructions:
+    this->stratDistance = new CountInstructions();
+    break;
+  }
+  switch (target) {
+  case AssertFail:
+    this->stratTarget = new FailingAssert();
+    break;
+  case FunctionCall:
+    this->stratTarget = new CallToSpecificFunction(info);
+    break;
+  case FunctionEnd:
+    this->stratTarget = new EndOfSpecificFunction(info);
+    break;
+  case FinalReturn:
+    this->stratTarget = new class FinalReturn();
+    break;
+  }
+}
+
+DijkstraSearcher::~DijkstraSearcher() {
+  delete stratDistance;
+  delete stratTarget;
+}
+
+void DijkstraSearcher::update(
+    ExecutionState *current, const std::vector<ExecutionState *> &addedStates,
+    const std::vector<ExecutionState *> &removedStates) {
+  // Internal counter for the number of states already deleted
+  uint deletedcounter = 0;
+
+  // Delete all removed States
+  for (std::multimap<uint, ExecutionState *>::iterator it =
+           distanceStore.begin();
+       it != distanceStore.end();) {
+
+    // Only iterate, till there is nothing more to be removed
+    if (deletedcounter == removedStates.size()) {
+      break;
+    }
+
+    // Test, if the current element is listed to be removed
+    if (std::find(removedStates.begin(), removedStates.end(), it->second) !=
+        removedStates.end()) {
+      // Erase it in the distanceStore
+
+      // This is a little bit complicated before c++11
+      // There `it = distanceStore.erase(it);` would be enough
+      // But for older c++ we need a second iterator
+      std::multimap<uint, ExecutionState *>::iterator old = it;
+      ++it;
+      distanceStore.erase(old);
+
+      // And increase the deletion counter
+      deletedcounter++;
+    } else {
+      // Otherwise just skip this element
+      ++it;
+    }
+  }
+
+  // Add all relevant states
+  for (std::vector<ExecutionState *>::const_iterator it = addedStates.begin();
+       it != addedStates.end(); it++) {
+    uint minfutureDistance = countFutureDistance(*it);
+
+    if (minfutureDistance == UINT_MAX) {
+      // If number of future decisions is already maximal
+      // do not add anything to it - avoids overflows
+      distanceStore.insert(std::make_pair(minfutureDistance, *it));
+    } else {
+      // Total decisions = previous decisions + future decisions
+      distanceStore.insert(
+          std::make_pair((*it)->depth + minfutureDistance, *it));
+    }
+  }
+}
+
+uint DijkstraSearcher::countFutureDistance(ExecutionState *current) {
+  // Extract starting instruction
+  llvm::Instruction *start = current->pc->inst;
+
+  // Build the stack
+  std::list<llvm::Instruction *> stack;
+  // Skip the first entry, cause it got no caller
+  for (std::vector<klee::StackFrame>::iterator it = (++current->stack.begin());
+       it != current->stack.end(); it++) {
+    stack.push_back(it->caller->inst);
+  }
+
+  // Start the search and return its result
+  class Dijkstra s(this->stratDistance, this->stratTarget, start, stack);
+  return s.searchForMinimalDistance();
 }
 
 ///

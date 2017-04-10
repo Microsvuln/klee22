@@ -10,11 +10,15 @@
 #ifndef KLEE_SEARCHER_H
 #define KLEE_SEARCHER_H
 
+#include "./Dijkstra/Dijkstra.h"
+#include "./Dijkstra/StratDistance.h"
+#include "./Dijkstra/StratTarget.h"
+#include "llvm/ADT/StringRef.h"
 #include "llvm/Support/raw_ostream.h"
-#include <vector>
-#include <set>
 #include <map>
 #include <queue>
+#include <set>
+#include <vector>
 
 namespace llvm {
   class BasicBlock;
@@ -76,7 +80,8 @@ namespace klee {
       NURS_Depth,
       NURS_ICnt,
       NURS_CPICnt,
-      NURS_QC
+      NURS_QC,
+      Dijkstra
     };
   };
 
@@ -299,6 +304,30 @@ namespace klee {
     }
   };
 
+  class DijkstraSearcher : public Searcher {
+    Executor &executor;
+    std::multimap<uint, ExecutionState *> distanceStore;
+    StratDistance *stratDistance;
+    StratTarget *stratTarget;
+    bool continueUnreachable;
+    uint countFutureDistance(ExecutionState *current);
+
+  public:
+    enum Target { AssertFail, FunctionCall, FunctionEnd, FinalReturn };
+
+    enum Distance { Decisions, Instructions };
+
+    DijkstraSearcher(Executor &_executor, DijkstraSearcher::Distance distance,
+                     DijkstraSearcher::Target target, llvm::StringRef info,
+                     bool _continueUnreachable);
+    ~DijkstraSearcher();
+    ExecutionState &selectState();
+    void update(ExecutionState *current,
+                const std::vector<ExecutionState *> &addedStates,
+                const std::vector<ExecutionState *> &removedStates);
+    bool empty() { return distanceStore.empty(); }
+    void printName(llvm::raw_ostream &os) { os << "DijkstraSearcher\n"; }
+  };
 }
 
 #endif
