@@ -419,6 +419,82 @@ uint DijkstraSearcher::countFutureDistance(ExecutionState *current) {
 
 ///
 
+AfterCallSearcher::AfterCallSearcher(Executor &_executor,
+                                     DijkstraSearcher::Distance distance,
+                                     DijkstraSearcher::Target target,
+                                     llvm::StringRef _targetFunctionName,
+                                     bool _continueUnreachable)
+    : DijkstraSearcher(_executor, distance, target, _targetFunctionName,
+                       _continueUnreachable),
+      targetFunctionName(_targetFunctionName),
+      nestedSearcher(WeightedRandomSearcher::CoveringNew) { /* empty */
+}
+
+AfterCallSearcher::~AfterCallSearcher() { /* empty */
+}
+
+ExecutionState &AfterCallSearcher::selectState() {
+  return (nestedSearcher.empty()) ? DijkstraSearcher::selectState()
+                                  : nestedSearcher.selectState();
+}
+
+void AfterCallSearcher::update(
+    ExecutionState *current, const std::vector<ExecutionState *> &addedStates,
+    const std::vector<ExecutionState *> &removedStates) {
+  DijkstraSearcher::update(current, addedStates, removedStates);
+
+  // Add interesting but not yet added states to the nested searcher
+  std::vector<ExecutionState *> nestedAddedStates;
+  for (std::vector<ExecutionState *>::const_iterator it = addedStates.begin();
+       it != addedStates.end(); ++it) {
+    if ((*it)->relationToTarget == ExecutionState::shouldBeAnalyzed) {
+      nestedAddedStates.push_back(*it);
+    }
+  }
+
+  ExecutionState *nestedCurrent = NULL;
+  if (current) {
+    // Current is now interesting, but was not added earlier
+    if (current->relationToTarget == ExecutionState::shouldBeAnalyzed &&
+        std::find(nestedAddedStates.begin(), nestedAddedStates.end(),
+                  current) == nestedAddedStates.end()) {
+      // Just add it now
+      nestedAddedStates.push_back(current);
+    }
+    // Current was added earlier
+    if (current->relationToTarget == ExecutionState::isAnalyzed) {
+      // Update it
+      nestedCurrent = current;
+    }
+  }
+
+  // Only states added earlier should be removed from the nested searcher
+  std::vector<ExecutionState *> nestedRemovedStates;
+  for (std::vector<ExecutionState *>::const_iterator it = removedStates.begin();
+       it != removedStates.end(); ++it) {
+    if ((*it)->relationToTarget == ExecutionState::isAnalyzed) {
+      nestedRemovedStates.push_back(*it);
+    }
+  }
+
+  // Update the nested searcher with the new states
+  nestedSearcher.update(nestedCurrent, nestedAddedStates, nestedRemovedStates);
+
+  // Update the states inside the execution states
+  for (std::vector<ExecutionState *>::const_iterator it =
+           nestedAddedStates.begin();
+       it != nestedAddedStates.end(); ++it) {
+    (*it)->relationToTarget = ExecutionState::isAnalyzed;
+  }
+  for (std::vector<ExecutionState *>::const_iterator it =
+           nestedRemovedStates.begin();
+       it != nestedRemovedStates.end(); ++it) {
+    (*it)->relationToTarget = ExecutionState::shouldBeAnalyzed;
+  }
+}
+
+///
+
 BumpMergingSearcher::BumpMergingSearcher(Executor &_executor, Searcher *_baseSearcher) 
   : executor(_executor),
     baseSearcher(_baseSearcher),

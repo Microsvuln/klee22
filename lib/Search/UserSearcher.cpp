@@ -12,6 +12,7 @@
 #include "Searcher.h"
 #include "../Core/Executor.h"
 
+#include "klee/CommandLine.h"
 #include "klee/Internal/Support/ErrorHandling.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/CommandLine.h"
@@ -44,6 +45,9 @@ cl::list<Searcher::CoreSearchType> CoreSearch(
         clEnumValN(Searcher::NURS_QC, "nurs:qc", "use NURS with Query-Cost"),
         clEnumValN(Searcher::Dijkstra, "dijkstra",
                    "use dijkstra algorithm for targeted analysis"),
+        clEnumValN(
+            Searcher::AfterCall, "after-call",
+            "focus the explorations on branches calling a specific function"),
         clEnumValEnd));
 
 cl::opt<bool>
@@ -161,6 +165,16 @@ Searcher *getNewSearcher(Searcher::CoreSearchType type, Executor &executor) {
     searcher = new DijkstraSearcher(executor, selectedDistance, selectedTarget,
                                     TargetInfo, ContinueUnreachable);
     break;
+  case Searcher::AfterCall:
+    if (AfterFunctionName == "-") {
+      llvm::errs() << "after-call search mode requires a target function";
+      llvm::errs() << " please add --after-function=... to your parameters\n";
+      exit(1);
+    }
+
+    searcher = new AfterCallSearcher(
+        executor, DijkstraSearcher::Distance::Decisions,
+        DijkstraSearcher::Target::FunctionCall, AfterFunctionName, false);
   }
 
   return searcher;

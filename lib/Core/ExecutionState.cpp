@@ -14,6 +14,7 @@
 #include "klee/Internal/Module/KInstruction.h"
 #include "klee/Internal/Module/KModule.h"
 
+#include "klee/CommandLine.h"
 #include "klee/Expr.h"
 
 #include "Memory.h"
@@ -66,23 +67,24 @@ StackFrame::~StackFrame() {
 
 /***/
 
-ExecutionState::ExecutionState(KFunction *kf) :
-    pc(kf->instructions),
-    prevPC(pc),
+ExecutionState::ExecutionState(KFunction *kf)
+    : pc(kf->instructions), prevPC(pc),
 
-    queryCost(0.), 
-    weight(1),
-    depth(0),
+      queryCost(0.), weight(1), depth(0),
 
-    instsSinceCovNew(0),
-    coveredNew(false),
-    forkDisabled(false),
-    ptreeNode(0) {
+      relationToTarget(notRelevant),
+
+      instsSinceCovNew(0), coveredNew(false), forkDisabled(false),
+      ptreeNode(0) {
   pushFrame(0, kf);
+  if (kf->function->getName().equals(AfterFunctionName)) {
+    relationToTarget = shouldBeAnalyzed;
+  }
 }
 
 ExecutionState::ExecutionState(const std::vector<ref<Expr> > &assumptions)
-    : constraints(assumptions), queryCost(0.), ptreeNode(0) {}
+    : constraints(assumptions), queryCost(0.), relationToTarget(notRelevant),
+      ptreeNode(0) {}
 
 ExecutionState::~ExecutionState() {
   for (unsigned int i=0; i<symbolics.size(); i++)
@@ -97,31 +99,22 @@ ExecutionState::~ExecutionState() {
   while (!stack.empty()) popFrame();
 }
 
-ExecutionState::ExecutionState(const ExecutionState& state):
-    fnAliases(state.fnAliases),
-    pc(state.pc),
-    prevPC(state.prevPC),
-    stack(state.stack),
-    incomingBBIndex(state.incomingBBIndex),
+ExecutionState::ExecutionState(const ExecutionState &state)
+    : fnAliases(state.fnAliases), pc(state.pc), prevPC(state.prevPC),
+      stack(state.stack), incomingBBIndex(state.incomingBBIndex),
 
-    addressSpace(state.addressSpace),
-    constraints(state.constraints),
+      addressSpace(state.addressSpace), constraints(state.constraints),
 
-    queryCost(state.queryCost),
-    weight(state.weight),
-    depth(state.depth),
+      queryCost(state.queryCost), weight(state.weight), depth(state.depth),
 
-    pathOS(state.pathOS),
-    symPathOS(state.symPathOS),
+      relationToTarget(state.relationToTarget),
 
-    instsSinceCovNew(state.instsSinceCovNew),
-    coveredNew(state.coveredNew),
-    forkDisabled(state.forkDisabled),
-    coveredLines(state.coveredLines),
-    ptreeNode(state.ptreeNode),
-    symbolics(state.symbolics),
-    arrayNames(state.arrayNames)
-{
+      pathOS(state.pathOS), symPathOS(state.symPathOS),
+
+      instsSinceCovNew(state.instsSinceCovNew), coveredNew(state.coveredNew),
+      forkDisabled(state.forkDisabled), coveredLines(state.coveredLines),
+      ptreeNode(state.ptreeNode), symbolics(state.symbolics),
+      arrayNames(state.arrayNames) {
   for (unsigned int i=0; i<symbolics.size(); i++)
     symbolics[i].first->refCount++;
 }
@@ -136,10 +129,17 @@ ExecutionState *ExecutionState::branch() {
   weight *= .5;
   falseState->weight -= weight;
 
+  falseState->relationToTarget =
+      (this->relationToTarget != notRelevant) ? shouldBeAnalyzed : notRelevant;
+
   return falseState;
 }
 
 void ExecutionState::pushFrame(KInstIterator caller, KFunction *kf) {
+  if (this->relationToTarget == notRelevant &&
+      kf->function->getName() == AfterFunctionName) {
+    this->relationToTarget = shouldBeAnalyzed;
+  }
   stack.push_back(StackFrame(caller,kf));
 }
 
@@ -198,6 +198,10 @@ bool ExecutionState::merge(const ExecutionState &b) {
   // implies difference in object states?
   if (symbolics!=b.symbolics)
     return false;
+
+  if (relationToTarget != b.relationToTarget) {
+    return false;
+  }
 
   {
     std::vector<StackFrame>::const_iterator itA = stack.begin();

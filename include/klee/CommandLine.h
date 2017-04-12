@@ -6,6 +6,8 @@
 #ifndef KLEE_COMMANDLINE_H
 #define KLEE_COMMANDLINE_H
 
+#include <string>
+
 #include "llvm/Support/CommandLine.h"
 #include "klee/Config/config.h"
 
@@ -43,6 +45,8 @@ enum QueryLoggingSolverType
  * wants to patch their copy of LLVM just for these options.
  */
 extern llvm::cl::list<QueryLoggingSolverType> queryLoggingOptions;
+
+extern llvm::cl::opt<std::string> AfterFunctionName;
 
 enum CoreSolverType {
   STP_SOLVER,

@@ -82,6 +82,11 @@ llvm::cl::list<QueryLoggingSolverType> queryLoggingOptions(
     llvm::cl::CommaSeparated
 );
 
+llvm::cl::opt<std::string> AfterFunctionName(
+    "after-function",
+    llvm::cl::desc("Name of the function on which after-search should focus"),
+    llvm::cl::init("-"));
+
 #ifdef ENABLE_METASMT
 
 #ifdef METASMT_DEFAULT_BACKEND_IS_BTOR

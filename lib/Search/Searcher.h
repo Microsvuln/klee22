@@ -81,7 +81,8 @@ namespace klee {
       NURS_ICnt,
       NURS_CPICnt,
       NURS_QC,
-      Dijkstra
+      Dijkstra,
+      AfterCall
     };
   };
 
@@ -327,6 +328,23 @@ namespace klee {
                 const std::vector<ExecutionState *> &removedStates);
     bool empty() { return distanceStore.empty(); }
     void printName(llvm::raw_ostream &os) { os << "DijkstraSearcher\n"; }
+  };
+
+  class AfterCallSearcher : public DijkstraSearcher {
+    llvm::StringRef targetFunctionName;
+    WeightedRandomSearcher nestedSearcher;
+
+  public:
+    AfterCallSearcher(Executor &_executor, DijkstraSearcher::Distance distance,
+                      DijkstraSearcher::Target target,
+                      llvm::StringRef targetFunctionName,
+                      bool _continueUnreachable);
+    ~AfterCallSearcher();
+    ExecutionState &selectState();
+    void update(ExecutionState *current,
+                const std::vector<ExecutionState *> &addedStates,
+                const std::vector<ExecutionState *> &removedStates);
+    void printName(llvm::raw_ostream &os) { os << "AfterCallSearcher\n"; }
   };
 }
 
