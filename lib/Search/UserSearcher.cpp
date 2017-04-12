@@ -16,6 +16,8 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/CommandLine.h"
 
+#include <string>
+
 using namespace llvm;
 using namespace klee;
 
@@ -100,7 +102,7 @@ cl::list<DijkstraSearcher::Distance> DijkstraDistance(
                           "Count the number of instructions"),
                clEnumValEnd));
 
-cl::opt<StringRef>
+cl::opt<std::string>
     TargetInfo("dij-target-info",
                cl::desc("Additional info for the target of dijkstra search"),
                cl::init("-"));
