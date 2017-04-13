@@ -306,12 +306,17 @@ namespace klee {
   };
 
   class DijkstraSearcher : public Searcher {
+  protected:
     Executor &executor;
     std::multimap<uint, ExecutionState *> distanceStore;
     StratDistance *stratDistance;
     StratTarget *stratTarget;
     bool continueUnreachable;
+    void addState(ExecutionState *state);
+    void addState(ExecutionState *state, uint minfutureDistance);
     uint countFutureDistance(ExecutionState *current);
+    void deleteStates(const std::vector<ExecutionState *> &removedStates);
+    virtual void terminateStateIfRequired(ExecutionState *state, uint distance);
 
   public:
     enum Target { AssertFail, FunctionCall, FunctionEnd, FinalReturn };
@@ -333,6 +338,9 @@ namespace klee {
   class AfterCallSearcher : public DijkstraSearcher {
     llvm::StringRef targetFunctionName;
     WeightedRandomSearcher nestedSearcher;
+
+  protected:
+    void terminateStateIfRequired(ExecutionState *state, uint distance);
 
   public:
     AfterCallSearcher(Executor &_executor, DijkstraSearcher::Distance distance,

@@ -299,19 +299,6 @@ bool RandomPathSearcher::empty() {
 
 ///
 
-ExecutionState &DijkstraSearcher::selectState() {
-  // Get the state with the shortest distance
-  std::multimap<unsigned int, klee::ExecutionState *>::iterator next =
-      distanceStore.lower_bound(0);
-
-  // if requested, stop further execution of states that cannot reach the target
-  if (!this->continueUnreachable && next->first == UINT_MAX) {
-    executor.terminateState(*(next->second));
-  }
-
-  return *(next->second);
-}
-
 DijkstraSearcher::DijkstraSearcher(Executor &_executor,
                                    DijkstraSearcher::Distance distance,
                                    DijkstraSearcher::Target target,
@@ -347,13 +334,90 @@ DijkstraSearcher::~DijkstraSearcher() {
   delete stratTarget;
 }
 
+ExecutionState &DijkstraSearcher::selectState() {
+  // Get the state with the shortest distance
+  std::multimap<unsigned int, klee::ExecutionState *>::iterator next =
+      distanceStore.lower_bound(0);
+
+  this->terminateStateIfRequired(next->second, next->first);
+
+  return *(next->second);
+}
+
 void DijkstraSearcher::update(
     ExecutionState *current, const std::vector<ExecutionState *> &addedStates,
     const std::vector<ExecutionState *> &removedStates) {
+
+  // Check if we have to update the current execution state
+  if (current &&
+      std::find(removedStates.begin(), removedStates.end(), current) ==
+          removedStates.end()) {
+    uint currminfutureDistance = countFutureDistance(current);
+
+    // Update the current distance in storage
+    /*
+    std::vector<ExecutionState *> tmp;
+    tmp.push_back(current);
+    deleteStates(std::vector<ExecutionState *>(tmp));
+    addState(current, currminfutureDistance);
+    */
+
+    this->terminateStateIfRequired(current, currminfutureDistance);
+  }
+
+  // Delete all removed States
+  deleteStates(removedStates);
+
+  // Add all relevant states
+  for (std::vector<ExecutionState *>::const_iterator it = addedStates.begin();
+       it != addedStates.end(); it++) {
+    addState(*it);
+  }
+}
+
+void DijkstraSearcher::addState(ExecutionState *state) {
+  uint minfutureDistance = countFutureDistance(state);
+  addState(state, minfutureDistance);
+}
+
+void DijkstraSearcher::addState(ExecutionState *state, uint minfutureDistance) {
+  if (minfutureDistance == UINT_MAX) {
+    // If number of future decisions is already maximal
+    // do not add anything to it - avoids overflows
+    distanceStore.insert(std::make_pair(minfutureDistance, state));
+  } else {
+    // Total decisions = previous decisions + future decisions
+    distanceStore.insert(
+        std::make_pair(state->depth + minfutureDistance, state));
+  }
+}
+
+uint DijkstraSearcher::countFutureDistance(ExecutionState *current) {
+  // Extract starting instruction
+  llvm::Instruction *start = current->pc->inst;
+
+  // Build the stack
+  std::list<llvm::Instruction *> stack;
+  // Skip the first entry, cause it got no caller
+  for (std::vector<klee::StackFrame>::iterator it = (++current->stack.begin());
+       it != current->stack.end(); it++) {
+    stack.push_back(it->caller->inst);
+  }
+
+  // Start the search and return its result
+  class Dijkstra s(this->stratDistance, this->stratTarget, start, stack);
+  return s.searchForMinimalDistance();
+}
+
+void DijkstraSearcher::deleteStates(
+    const std::vector<ExecutionState *> &removedStates) {
+  // Stop if there is nothing to do
+  if (removedStates.empty()) {
+    return;
+  }
   // Internal counter for the number of states already deleted
   uint deletedcounter = 0;
 
-  // Delete all removed States
   for (std::multimap<uint, ExecutionState *>::iterator it =
            distanceStore.begin();
        it != distanceStore.end();) {
@@ -382,39 +446,15 @@ void DijkstraSearcher::update(
       ++it;
     }
   }
-
-  // Add all relevant states
-  for (std::vector<ExecutionState *>::const_iterator it = addedStates.begin();
-       it != addedStates.end(); it++) {
-    uint minfutureDistance = countFutureDistance(*it);
-
-    if (minfutureDistance == UINT_MAX) {
-      // If number of future decisions is already maximal
-      // do not add anything to it - avoids overflows
-      distanceStore.insert(std::make_pair(minfutureDistance, *it));
-    } else {
-      // Total decisions = previous decisions + future decisions
-      distanceStore.insert(
-          std::make_pair((*it)->depth + minfutureDistance, *it));
-    }
-  }
 }
 
-uint DijkstraSearcher::countFutureDistance(ExecutionState *current) {
-  // Extract starting instruction
-  llvm::Instruction *start = current->pc->inst;
-
-  // Build the stack
-  std::list<llvm::Instruction *> stack;
-  // Skip the first entry, cause it got no caller
-  for (std::vector<klee::StackFrame>::iterator it = (++current->stack.begin());
-       it != current->stack.end(); it++) {
-    stack.push_back(it->caller->inst);
+void DijkstraSearcher::terminateStateIfRequired(ExecutionState *state,
+                                                uint distance) {
+  // Stop further execution if the target cannot be reached anymore
+  if (!this->continueUnreachable && distance == UINT_MAX) {
+    // Just stop any further execution
+    executor.terminateState(*state);
   }
-
-  // Start the search and return its result
-  class Dijkstra s(this->stratDistance, this->stratTarget, start, stack);
-  return s.searchForMinimalDistance();
 }
 
 ///
@@ -490,6 +530,14 @@ void AfterCallSearcher::update(
            nestedRemovedStates.begin();
        it != nestedRemovedStates.end(); ++it) {
     (*it)->relationToTarget = ExecutionState::shouldBeAnalyzed;
+  }
+}
+
+void AfterCallSearcher::terminateStateIfRequired(ExecutionState *state,
+                                                 uint distance) {
+  // Only irrelevant states should be terminated early
+  if (state->relationToTarget == ExecutionState::notRelevant) {
+    DijkstraSearcher::terminateStateIfRequired(state, distance);
   }
 }
 
