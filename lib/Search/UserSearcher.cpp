@@ -139,7 +139,7 @@ Searcher *getNewSearcher(Searcher::CoreSearchType type, Executor &executor) {
     // Parse the distance
     DijkstraSearcher::Distance selectedDistance;
     if (DijkstraDistance.size() == 0) {
-      selectedDistance = DijkstraSearcher::Distance::Decisions;
+      selectedDistance = DijkstraSearcher::Decisions;
     } else {
       selectedDistance = *DijkstraDistance.begin();
     }
@@ -147,14 +147,14 @@ Searcher *getNewSearcher(Searcher::CoreSearchType type, Executor &executor) {
     // Parse the target
     DijkstraSearcher::Target selectedTarget;
     if (DijkstraTarget.size() == 0) {
-      selectedTarget = DijkstraSearcher::Target::AssertFail;
+      selectedTarget = DijkstraSearcher::AssertFail;
     } else {
       selectedTarget = *DijkstraTarget.begin();
     }
 
     // Check for target information
-    if ((selectedTarget == DijkstraSearcher::Target::FunctionCall ||
-         selectedTarget == DijkstraSearcher::Target::FunctionEnd) &&
+    if ((selectedTarget == DijkstraSearcher::FunctionCall ||
+         selectedTarget == DijkstraSearcher::FunctionEnd) &&
         TargetInfo == "-") {
       llvm::errs()
           << "This mode of DijkstraSearcher requires target information \n";
@@ -173,8 +173,8 @@ Searcher *getNewSearcher(Searcher::CoreSearchType type, Executor &executor) {
     }
 
     searcher = new AfterCallSearcher(
-        executor, DijkstraSearcher::Distance::Decisions,
-        DijkstraSearcher::Target::FunctionCall, AfterFunctionName, false);
+        executor, DijkstraSearcher::Decisions,
+        DijkstraSearcher::FunctionCall, AfterFunctionName, false);
   }
 
   return searcher;
