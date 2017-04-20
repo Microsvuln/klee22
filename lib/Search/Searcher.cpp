@@ -355,12 +355,8 @@ void DijkstraSearcher::update(
     uint currminfutureDistance = countFutureDistance(current);
 
     // Update the current distance in storage
-    /*
-    std::vector<ExecutionState *> tmp;
-    tmp.push_back(current);
-    deleteStates(std::vector<ExecutionState *>(tmp));
-    addState(current, currminfutureDistance);
-    */
+    this->removeState(current);
+    this->addState(current, currminfutureDistance);
 
     this->terminateStateIfRequired(current, currminfutureDistance);
   }
