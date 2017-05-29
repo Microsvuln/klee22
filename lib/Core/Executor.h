@@ -83,6 +83,7 @@ namespace klee {
 class Executor : public Interpreter {
   friend class BumpMergingSearcher;
   friend class MergingSearcher;
+  friend class SonarSearcher;
   friend class RandomPathSearcher;
   friend class OwningSearcher;
   friend class WeightedRandomSearcher;
@@ -116,12 +117,13 @@ public:
     Unhandled
   };
 
+  KModule *kmodule;
+
 private:
   static const char *TerminateReasonNames[];
 
   class TimerInfo;
 
-  KModule *kmodule;
   InterpreterHandler *interpreterHandler;
   Searcher *searcher;
 

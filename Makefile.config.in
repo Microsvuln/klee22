@@ -83,4 +83,7 @@ CFLAGS := @CFLAGS@ -Wall -g
 CXXFLAGS := @CXXFLAGS@ -g -Wall
 LDFLAGS := @LDFLAGS@ -g
 
+# Remove nasty LLVM scc_iterator segmentation fault
+CXXFLAGS := @CXXFLAGS@ -DNDEBUG
+
 REQUIRES_RTTI := @REQUIRES_RTTI@

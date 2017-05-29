@@ -31,6 +31,7 @@ namespace {
 			clEnumValN(Searcher::NURS_ICnt, "nurs:icnt", "use NURS with Instr-Count"),
 			clEnumValN(Searcher::NURS_CPICnt, "nurs:cpicnt", "use NURS with CallPath-Instr-Count"),
 			clEnumValN(Searcher::NURS_QC, "nurs:qc", "use NURS with Query-Cost"),
+      clEnumValN(Searcher::Sonar, "sonar", "use sonar search for targeted analysis"),
 			clEnumValEnd));
 
   cl::opt<bool>
@@ -61,6 +62,38 @@ namespace {
   UseBumpMerge("use-bump-merge", 
            cl::desc("Enable support for klee_merge() (extra experimental)"));
 
+  cl::list<Scanner::Target> SonarTarget(
+    "sonar-target",
+    cl::desc("Specify the target for the sonar search strategy"),
+    cl::values(clEnumValN(Scanner::AssertFail, "assert-fail",
+                                "Aim for failing assert statements (default)"),
+               clEnumValN(Scanner::FunctionCall, "function-call",
+                          "Aim for the call to a specific function"),
+               clEnumValN(Scanner::FunctionReturn, "function-return",
+                          "Aim for the return of a specific function"),
+               clEnumValEnd));
+
+  cl::list<Scanner::Distance> SonarDistance(
+    "sonar-distance",
+    cl::desc(
+        "Specify the distance measure for the sonar search strategy"),
+    cl::values(
+        clEnumValN(Scanner::Decisions, "decisions",
+                   "Count the number of branching decisions (default)"),
+        clEnumValN(Scanner::Instructions, "instructions",
+                   "Count the number of instructions"),
+        clEnumValEnd));
+
+  cl::opt<std::string>
+    TargetInfo("sonar-target-info",
+               llvm::cl::desc("Additional info for the target of sonar search"),
+               llvm::cl::init("-"));
+
+  cl::opt<bool> ContinueUnreachable(
+      "sonar-continue-unreachable",
+      cl::desc("Continue the analysis even if the target is no longer reachable"),
+      cl::init(false));
+
 }
 
 
@@ -86,6 +119,13 @@ Searcher *getNewSearcher(Searcher::CoreSearchType type, Executor &executor) {
   case Searcher::NURS_ICnt: searcher = new WeightedRandomSearcher(WeightedRandomSearcher::InstCount); break;
   case Searcher::NURS_CPICnt: searcher = new WeightedRandomSearcher(WeightedRandomSearcher::CPInstCount); break;
   case Searcher::NURS_QC: searcher = new WeightedRandomSearcher(WeightedRandomSearcher::QueryCost); break;
+  case Searcher::Sonar:
+
+    auto sonarDistance = (SonarDistance.empty()) ? Scanner::Decisions : *SonarDistance.begin();
+    auto sonarTarget = (SonarTarget.empty()) ? Scanner::AssertFail : *SonarTarget.begin();
+    // searcher = new SonarSearcher(executor, sonarDistance,sonarTarget, TargetInfo, ContinueUnreachable);
+    exit(42);
+    break;
   }
 
   return searcher;
