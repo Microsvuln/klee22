@@ -16,6 +16,8 @@
 #include <algorithm>
 #include <cstdint>
 
+#include "../../include/klee/Internal/Module/KModule.h"  // TODO remove
+
 bool Scanner::isTheTarget(const llvm::Instruction *instr) {
   switch (this->target) {
   case AllReturns:
@@ -56,23 +58,18 @@ uint64_t Scanner::distance2Pass(const llvm::Instruction *instr) {
     return 0;
     break;
   }
-  return -1;
+  return std::numeric_limits<uint64_t>::max();
 }
 
 void Scanner::scan() {
   llvm::CallGraph cg{};
   cg.runOnModule(*this->module);
 
-  llvm::outs() << "After runON" << '\n';
-
   auto testSCC = llvm::scc_begin(&cg);
-
-  llvm::outs() << "Testing" << '\n';
 
   for (auto cgnSCC = llvm::scc_begin<llvm::CallGraph *>(&cg),
             cgnSCCe = llvm::scc_end(&cg);
        cgnSCC != cgnSCCe; ++cgnSCC) {
-    llvm::outs() << "Don't work" << '\n';
     bool cgnSCCchanged;
     do {
       cgnSCCchanged = false;
@@ -126,6 +123,7 @@ void Scanner::scan() {
       }
     } while (cgnSCCchanged);
   }
+  // this->dump();
 }
 
 uint64_t &Scanner::operator[](const llvm::Instruction *instr) {
@@ -166,26 +164,27 @@ uint64_t Scanner4Target::getDistanceForCall(uint64_t prevDist,
   return 0;
 }
 
-uint64_t Scanner4Target::getDistance2Target(
-    const llvm::Instruction *pos,
-    std::vector<const llvm::Instruction *> &stack) {
-  uint64_t minDist = anno[pos];
-  uint64_t prevPassed = dist2return[pos];
-
-  for (auto instr = stack.rbegin(); instr != stack.rend(); ++instr) {
-    minDist = std::min(minDist, sumOrMax(prevPassed, anno[*instr]));
-    prevPassed += dist2return[*instr];
-  }
-  return minDist;
-}
-
 uint64_t Scanner4Target::getDistance2Target(const klee::ExecutionState * state) {
+  // Initialize the distances from the current position without considering the stack
   uint64_t minDist = anno[state->pc->inst];
   uint64_t prevPassed = dist2return[state->pc->inst];
 
-  for (auto it = (++state->stack.begin()); it != state->stack.end(); it++) {
-    minDist = std::min(minDist, sumOrMax(prevPassed, anno[it->caller->inst]));
-    prevPassed += dist2return[it->caller->inst];
+  // --state->...rend() Skips the first caller (i.e. void -> main)
+  for (auto it = state->stack.rbegin(); it != --(state->stack.rend()); ++it) {
+    // Get the instruction after the call
+    klee::KInstIterator next = it->caller;
+    ++next;
+
+    // Either we have found the shortest way earlier
+    // or we must consider the shortest way to go up the stack till here
+    // and go directly to the target from here
+    minDist = std::min(minDist, sumOrMax(prevPassed, anno[next->inst]));
+    prevPassed += dist2return[next->inst];
+
+    // Small short-cut: prevPassed increases monotonically
+    if (prevPassed > minDist) {
+      break;
+    }
   }
   return minDist;
 }

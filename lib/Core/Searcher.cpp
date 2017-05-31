@@ -137,10 +137,8 @@ ExecutionState &SonarSearcher::selectState() {
   std::multimap<uint64_t, klee::ExecutionState *>::iterator next =
       distanceStore.lower_bound(0);
 
-  // if requested, stop further execution of states that cannot reach the target
-  if (!this->continueUnreachable && next->first == std::numeric_limits<uint64_t>::max()) {
-    executor.terminateState(*(next->second));
-  }
+  // Terminate the state if requested
+  this->terminateStateIfRequired(next->second, next->first);
 
   return *(next->second);
 }
@@ -149,11 +147,13 @@ void SonarSearcher::update(
     ExecutionState *current, const std::vector<ExecutionState *> &addedStates,
     const std::vector<ExecutionState *> &removedStates) {
 
+  // llvm::errs() << "Update was called" << '\n';
+
   // Check if we have to update the current execution state
   if (current &&
       std::find(removedStates.begin(), removedStates.end(), current) ==
           removedStates.end()) {
-    uint currminfutureDistance = calcFutureDistance(current);
+    uint64_t currminfutureDistance = calcFutureDistance(current);
 
     // Update the current distance in storage
     this->removeState(current);

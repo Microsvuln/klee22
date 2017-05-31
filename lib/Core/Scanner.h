@@ -76,7 +76,5 @@ public:
         dist2return(module, distance){/*empty*/};
 
   ~Scanner4Target(){/*empty*/};
-  uint64_t getDistance2Target(const llvm::Instruction *pos,
-                              std::vector<const llvm::Instruction *> &stack);
   uint64_t getDistance2Target(const klee::ExecutionState * state);
 };

@@ -123,8 +123,7 @@ Searcher *getNewSearcher(Searcher::CoreSearchType type, Executor &executor) {
 
     auto sonarDistance = (SonarDistance.empty()) ? Scanner::Decisions : *SonarDistance.begin();
     auto sonarTarget = (SonarTarget.empty()) ? Scanner::AssertFail : *SonarTarget.begin();
-    // searcher = new SonarSearcher(executor, sonarDistance,sonarTarget, TargetInfo, ContinueUnreachable);
-    exit(42);
+    searcher = new SonarSearcher(executor, sonarDistance,sonarTarget, TargetInfo, ContinueUnreachable);
     break;
   }
 
