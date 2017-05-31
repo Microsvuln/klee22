@@ -16,7 +16,6 @@
 #include <algorithm>
 #include <cstdint>
 
-#include "../../include/klee/Internal/Module/KModule.h"  // TODO remove
 
 bool Scanner::isTheTarget(const llvm::Instruction *instr) {
   switch (this->target) {
@@ -149,6 +148,45 @@ uint64_t Scanner4Return::getDistanceForCall(uint64_t prevDist,
 uint64_t Scanner4Target::getDistanceForCall(uint64_t prevDist,
                                             const llvm::CallInst *call) {
   llvm::Function *called = call->getCalledFunction();
+
+  // Manually resolve the function pointer to the original main function used
+  // in __uClibc_main of KLEE's uClibc implementation
+  if (llvm::isa<llvm::LoadInst>(call->getCalledValue()) &&
+      call->getParent()->getParent()->getName() == "__uClibc_main") {
+
+    // Extract the type of the function allocated in the called pointer
+    const llvm::LoadInst *load = llvm::cast<llvm::LoadInst>(call->getCalledValue());
+    const llvm::AllocaInst *alloca =
+        llvm::cast<llvm::AllocaInst>(load->getPointerOperand());
+    const llvm::PointerType *inptr =
+        llvm::cast<llvm::PointerType>(alloca->getAllocatedType());
+    const llvm::FunctionType *infnc =
+        llvm::cast<llvm::FunctionType>(inptr->getElementType());
+
+    // Check, if the inner function has the signature of a main function
+    if (infnc->getNumParams() == 3 && infnc->getReturnType()->isIntegerTy() &&
+        infnc->getParamType(0)->isIntegerTy() &&
+        infnc->getParamType(1)->isPointerTy() &&
+        infnc->getParamType(2)->isPointerTy()) {
+
+      // Find the call to uclibc inside the main function
+      llvm::CallInst *call2uclibc =
+          llvm::cast<llvm::CallInst>(call->getParent()
+                                         ->getParent()
+                                         ->getParent()
+                                         ->getFunction("main")
+                                         ->getEntryBlock()
+                                         .begin());
+       if (call2uclibc->getNumArgOperands() == 7) {
+        llvm::Value *probe = call2uclibc->getArgOperand(0)->stripPointerCasts();
+        if (llvm::isa<llvm::Function>(probe)) {
+          // Extract actual content of the parameter for the __uClibc_main call
+          called = llvm::cast<llvm::Function>(probe);
+        }
+      }
+    }
+  }
+
   if (called && !called->isIntrinsic() && !called->empty()) {
     // we take the shortest of two choices:
     // 1) Go to the target in the called function
@@ -160,8 +198,6 @@ uint64_t Scanner4Target::getDistanceForCall(uint64_t prevDist,
     // If it is an external function
     return sumOrMax(prevDist, distance2Pass(call));
   }
-
-  return 0;
 }
 
 uint64_t Scanner4Target::getDistance2Target(const klee::ExecutionState * state) {
