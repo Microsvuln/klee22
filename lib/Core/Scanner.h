@@ -5,6 +5,7 @@
 #include "llvm/IR/Module.h"
 #include "klee/ExecutionState.h"
 #include "klee/Internal/Module/KInstruction.h"
+#include <string>
 #include <vector>
 
 class Scanner {
@@ -16,13 +17,12 @@ protected:
   llvm::Module *const module;
   Distance distance;
   Target target;
-  const llvm::StringRef targetinfo;
+  const std::string targetinfo;
   Annotation anno;
 
   virtual uint64_t getDistanceForCall(uint64_t prevDist,
                                       const llvm::CallInst *call) = 0;
 
-  bool isTheTarget(const llvm::Instruction *instr);
   uint64_t distance2Pass(const llvm::Instruction *instr);
 
 public:
@@ -38,6 +38,7 @@ public:
   uint64_t &operator[](const llvm::BasicBlock *bb);
   uint64_t &operator[](const llvm::Function *func);
 
+  bool isTarget(const llvm::Instruction *instr);
   void dump();
   size_t size();
   void test();

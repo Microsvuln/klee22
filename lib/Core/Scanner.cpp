@@ -17,7 +17,7 @@
 #include <cstdint>
 
 
-bool Scanner::isTheTarget(const llvm::Instruction *instr) {
+bool Scanner::isTarget(const llvm::Instruction *instr) {
   switch (this->target) {
   case AllReturns:
     return llvm::isa<llvm::ReturnInst>(instr);
@@ -96,7 +96,7 @@ void Scanner::scan() {
               for (auto inst = bb->rbegin(), inste = bb->rend(); inst != inste;
                    ++inst) {
                 uint64_t newDist = std::numeric_limits<uint64_t>::max();
-                if (isTheTarget(&*inst)) {
+                if (isTarget(&*inst)) {
                   newDist = 0;
                 } else {
                   // Calls require a different logic

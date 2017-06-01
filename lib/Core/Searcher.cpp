@@ -147,8 +147,6 @@ void SonarSearcher::update(
     ExecutionState *current, const std::vector<ExecutionState *> &addedStates,
     const std::vector<ExecutionState *> &removedStates) {
 
-  // llvm::errs() << "Update was called" << '\n';
-
   // Check if we have to update the current execution state
   if (current &&
       std::find(removedStates.begin(), removedStates.end(), current) ==
