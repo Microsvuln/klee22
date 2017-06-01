@@ -89,6 +89,11 @@ namespace {
                llvm::cl::desc("Additional info for the target of sonar search"),
                llvm::cl::init("-"));
 
+  cl::opt<bool> StopAtTarget(
+      "sonar-stop-at-target",
+      cl::desc("Do not continue the analysis with states that have passed the target"),
+      cl::init(false));
+
   cl::opt<bool> ContinueUnreachable(
       "sonar-continue-unreachable",
       cl::desc("Continue the analysis even if the target is no longer reachable"),
@@ -123,7 +128,12 @@ Searcher *getNewSearcher(Searcher::CoreSearchType type, Executor &executor) {
 
     auto sonarDistance = (SonarDistance.empty()) ? Scanner::Decisions : *SonarDistance.begin();
     auto sonarTarget = (SonarTarget.empty()) ? Scanner::AssertFail : *SonarTarget.begin();
-    searcher = new SonarSearcher(executor, sonarDistance,sonarTarget, TargetInfo, ContinueUnreachable);
+
+    if (StopAtTarget) {
+      searcher = new SonarSearcher(executor, sonarDistance,sonarTarget, TargetInfo, ContinueUnreachable);
+    } else {
+      searcher = new SonarDeepSearcher(executor, sonarDistance,sonarTarget, TargetInfo, ContinueUnreachable);
+    }
     break;
   }
 

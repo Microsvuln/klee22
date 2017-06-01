@@ -112,32 +112,6 @@ namespace klee {
     }
   };
 
-  class SonarSearcher : public Searcher {
-    Executor &executor;
-    std::multimap<uint64_t, ExecutionState *> distanceStore;
-    Scanner4Target scanner;
-    bool continueUnreachable;
-    uint64_t calcFutureDistance(ExecutionState* state);
-
-    void addState(ExecutionState *state);
-    void addState(ExecutionState *state, uint64_t minfutureDistance);
-    void terminateStateIfRequired(ExecutionState *state, uint64_t distance);
-    void deleteStates(const std::vector<ExecutionState *> &removedStates);
-
-  public:
-    SonarSearcher(Executor &_executor, Scanner::Distance distance,
-                Scanner::Target target, const std::string targetinfo, bool _continueUnreachable)
-      : executor(_executor), scanner(_executor.kmodule->module, distance, target, targetinfo), continueUnreachable(_continueUnreachable) {};
-    ExecutionState &selectState();
-    void update(ExecutionState *current,
-                const std::vector<ExecutionState *> &addedStates,
-                const std::vector<ExecutionState *> &removedStates);
-    bool empty() { return distanceStore.empty(); }
-    void printName(llvm::raw_ostream &os) {
-      os << "SonarSearcher\n";
-    }
-  };
-
   class RandomSearcher : public Searcher {
     std::vector<ExecutionState*> states;
 
@@ -208,6 +182,49 @@ namespace klee {
     void printName(llvm::raw_ostream &os) {
       os << "RandomPathSearcher\n";
     }
+  };
+
+ class SonarSearcher : public Searcher {
+  protected:
+    Executor &executor;
+    std::multimap<uint64_t, ExecutionState *> distanceStore;
+    Scanner4Target scanner;
+    bool continueUnreachable;
+    uint64_t calcFutureDistance(ExecutionState* state);
+
+    void addState(ExecutionState *state);
+    void addState(ExecutionState *state, uint64_t minfutureDistance);
+    virtual void terminateStateIfRequired(ExecutionState *state, uint64_t distance);
+    void deleteStates(const std::vector<ExecutionState *> &removedStates);
+
+  public:
+    SonarSearcher(Executor &_executor, Scanner::Distance distance,
+                Scanner::Target target, const std::string targetinfo, bool _continueUnreachable)
+      : executor(_executor), scanner(_executor.kmodule->module, distance, target, targetinfo), continueUnreachable(_continueUnreachable) {};
+    ExecutionState &selectState();
+    void update(ExecutionState *current,
+                const std::vector<ExecutionState *> &addedStates,
+                const std::vector<ExecutionState *> &removedStates);
+    bool empty() { return distanceStore.empty(); }
+    void printName(llvm::raw_ostream &os) {
+      os << "SonarSearcher\n";
+    }
+  };
+
+  class SonarDeepSearcher : public SonarSearcher {
+    WeightedRandomSearcher nestedSearcher;
+  protected:
+    void terminateStateIfRequired(ExecutionState *state, uint64_t distance) override;
+  public:
+    SonarDeepSearcher(Executor &_executor, Scanner::Distance distance,
+                Scanner::Target target, const std::string targetinfo, bool _continueUnreachable)
+      : SonarSearcher(_executor, distance, target, targetinfo, _continueUnreachable), nestedSearcher(WeightedRandomSearcher::CoveringNew) {};
+
+    ExecutionState &selectState();
+    void update(ExecutionState *current,
+            const std::vector<ExecutionState *> &addedStates,
+            const std::vector<ExecutionState *> &removedStates);
+    void printName(llvm::raw_ostream &os) { os << "SonarDeepSearcher\n"; }
   };
 
   class MergingSearcher : public Searcher {

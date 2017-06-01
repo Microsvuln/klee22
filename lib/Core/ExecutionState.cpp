@@ -72,6 +72,7 @@ ExecutionState::ExecutionState(KFunction *kf) :
 
     queryCost(0.), 
     weight(1),
+    relationToTarget(notRelevant),
     depth(0),
 
     instsSinceCovNew(0),
@@ -82,7 +83,7 @@ ExecutionState::ExecutionState(KFunction *kf) :
 }
 
 ExecutionState::ExecutionState(const std::vector<ref<Expr> > &assumptions)
-    : constraints(assumptions), queryCost(0.), ptreeNode(0) {}
+    : constraints(assumptions), queryCost(0.), relationToTarget(notRelevant), ptreeNode(0) {}
 
 ExecutionState::~ExecutionState() {
   for (unsigned int i=0; i<symbolics.size(); i++)
@@ -109,6 +110,7 @@ ExecutionState::ExecutionState(const ExecutionState& state):
 
     queryCost(state.queryCost),
     weight(state.weight),
+    relationToTarget(notRelevant),
     depth(state.depth),
 
     pathOS(state.pathOS),
@@ -135,6 +137,9 @@ ExecutionState *ExecutionState::branch() {
 
   weight *= .5;
   falseState->weight -= weight;
+
+  falseState->relationToTarget =
+    (this->relationToTarget != notRelevant) ? shouldBeAnalyzed : notRelevant;
 
   return falseState;
 }
@@ -197,6 +202,9 @@ bool ExecutionState::merge(const ExecutionState &b) {
   // XXX is it even possible for these to differ? does it matter? probably
   // implies difference in object states?
   if (symbolics!=b.symbolics)
+    return false;
+
+  if (relationToTarget != b.relationToTarget)
     return false;
 
   {

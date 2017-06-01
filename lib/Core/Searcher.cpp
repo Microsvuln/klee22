@@ -132,107 +132,6 @@ void BFSSearcher::update(ExecutionState *current,
 
 ///
 
-ExecutionState &SonarSearcher::selectState() {
-  // Get the state with the shortest distance
-  std::multimap<uint64_t, klee::ExecutionState *>::iterator next =
-      distanceStore.lower_bound(0);
-
-  // Terminate the state if requested
-  this->terminateStateIfRequired(next->second, next->first);
-
-  return *(next->second);
-}
-
-void SonarSearcher::update(
-    ExecutionState *current, const std::vector<ExecutionState *> &addedStates,
-    const std::vector<ExecutionState *> &removedStates) {
-
-  // Check if we have to update the current execution state
-  if (current &&
-      std::find(removedStates.begin(), removedStates.end(), current) ==
-          removedStates.end()) {
-    uint64_t currminfutureDistance = calcFutureDistance(current);
-
-    // Update the current distance in storage
-    this->removeState(current);
-    this->addState(current, currminfutureDistance);
-
-    this->terminateStateIfRequired(current, currminfutureDistance);
-  }
-
-  // Delete all removed States
-  deleteStates(removedStates);
-
-  // Add all relevant states
-  for (std::vector<ExecutionState *>::const_iterator it = addedStates.begin();
-       it != addedStates.end(); it++) {
-    addState(*it);
-  }
-}
-
-uint64_t SonarSearcher::calcFutureDistance(ExecutionState* state) {
-  return this->scanner.getDistance2Target(state);
-}
-
-void SonarSearcher::addState(ExecutionState *state) {
-  uint64_t minfutureDistance = calcFutureDistance(state);
-  addState(state, minfutureDistance);
-}
-
-void SonarSearcher::addState(ExecutionState *state, uint64_t minfutureDistance) {
-  distanceStore.insert(std::make_pair(minfutureDistance, state));
-}
-
-void SonarSearcher::deleteStates(
-    const std::vector<ExecutionState *> &removedStates) {
-  // Stop if there is nothing to do
-  if (removedStates.empty()) {
-    return;
-  }
-  // Internal counter for the number of states already deleted
-  uint64_t deletedcounter = 0;
-
-  for (std::multimap<uint64_t, ExecutionState *>::iterator it =
-           distanceStore.begin();
-       it != distanceStore.end();) {
-
-    // Only iterate, till there is nothing more to be removed
-    if (deletedcounter == removedStates.size()) {
-      break;
-    }
-
-    // Test, if the current element is listed to be removed
-    if (std::find(removedStates.begin(), removedStates.end(), it->second) !=
-        removedStates.end()) {
-      // Erase it in the distanceStore
-
-      // This is a little bit complicated before c++11
-      // There `it = distanceStore.erase(it);` would be enough
-      // But for older c++ we need a second iterator
-      std::multimap<uint64_t, ExecutionState *>::iterator old = it;
-      ++it;
-      distanceStore.erase(old);
-
-      // And increase the deletion counter
-      deletedcounter++;
-    } else {
-      // Otherwise just skip this element
-      ++it;
-    }
-  }
-}
-
-void SonarSearcher::terminateStateIfRequired(ExecutionState *state,
-                                             uint64_t distance) {
-  // Stop further execution if the target cannot be reached anymore
-  if (!this->continueUnreachable && distance == std::numeric_limits<uint64_t>::max()) {
-    // Just stop any further execution
-    executor.terminateState(*state);
-  }
-}
-
-///
-
 ExecutionState &RandomSearcher::selectState() {
   return *states[theRNG.getInt32()%states.size()];
 }
@@ -394,6 +293,185 @@ RandomPathSearcher::update(ExecutionState *current,
 
 bool RandomPathSearcher::empty() { 
   return executor.states.empty(); 
+}
+
+///
+
+ExecutionState &SonarSearcher::selectState() {
+  // Get the state with the shortest distance
+  std::multimap<uint64_t, klee::ExecutionState *>::iterator next =
+      distanceStore.lower_bound(0);
+
+  // Terminate the state if requested
+  this->terminateStateIfRequired(next->second, next->first);
+
+  return *(next->second);
+}
+
+void SonarSearcher::update(
+    ExecutionState *current, const std::vector<ExecutionState *> &addedStates,
+    const std::vector<ExecutionState *> &removedStates) {
+
+  // Check if we have to update the current execution state
+  if (current &&
+      std::find(removedStates.begin(), removedStates.end(), current) ==
+          removedStates.end()) {
+    uint64_t currminfutureDistance = calcFutureDistance(current);
+
+    // Update the current distance in storage
+    this->removeState(current);
+    this->addState(current, currminfutureDistance);
+
+    this->terminateStateIfRequired(current, currminfutureDistance);
+  }
+
+  // Delete all removed States
+  deleteStates(removedStates);
+
+  // Add all relevant states
+  for (std::vector<ExecutionState *>::const_iterator it = addedStates.begin();
+       it != addedStates.end(); it++) {
+    addState(*it);
+  }
+}
+
+uint64_t SonarSearcher::calcFutureDistance(ExecutionState* state) {
+  return this->scanner.getDistance2Target(state);
+}
+
+void SonarSearcher::addState(ExecutionState *state) {
+  uint64_t minfutureDistance = calcFutureDistance(state);
+  addState(state, minfutureDistance);
+}
+
+void SonarSearcher::addState(ExecutionState *state, uint64_t minfutureDistance) {
+  distanceStore.insert(std::make_pair(minfutureDistance, state));
+}
+
+void SonarSearcher::deleteStates(
+    const std::vector<ExecutionState *> &removedStates) {
+  // Stop if there is nothing to do
+  if (removedStates.empty()) {
+    return;
+  }
+  // Internal counter for the number of states already deleted
+  uint64_t deletedcounter = 0;
+
+  for (std::multimap<uint64_t, ExecutionState *>::iterator it =
+           distanceStore.begin();
+       it != distanceStore.end();) {
+
+    // Only iterate, till there is nothing more to be removed
+    if (deletedcounter == removedStates.size()) {
+      break;
+    }
+
+    // Test, if the current element is listed to be removed
+    if (std::find(removedStates.begin(), removedStates.end(), it->second) !=
+        removedStates.end()) {
+      // Erase it in the distanceStore
+
+      // This is a little bit complicated before c++11
+      // There `it = distanceStore.erase(it);` would be enough
+      // But for older c++ we need a second iterator
+      std::multimap<uint64_t, ExecutionState *>::iterator old = it;
+      ++it;
+      distanceStore.erase(old);
+
+      // And increase the deletion counter
+      deletedcounter++;
+    } else {
+      // Otherwise just skip this element
+      ++it;
+    }
+  }
+}
+
+void SonarSearcher::terminateStateIfRequired(ExecutionState *state,
+                                             uint64_t distance) {
+  // Stop further execution if the target cannot be reached anymore
+  if (!this->continueUnreachable && distance == std::numeric_limits<uint64_t>::max()) {
+    // Just stop any further execution
+    executor.terminateState(*state);
+  }
+}
+
+///
+
+ExecutionState &SonarDeepSearcher::selectState() {
+  if (!nestedSearcher.empty()) {
+    return nestedSearcher.selectState();
+  }
+
+  ExecutionState &selected = SonarSearcher::selectState();
+  // Update the selected state as relevant if target is reached
+  if (selected.relationToTarget == ExecutionState::notRelevant && this->scanner.isTarget(selected.pc->inst)) {
+    selected.relationToTarget = ExecutionState::shouldBeAnalyzed;
+  }
+  return selected;
+}
+
+void SonarDeepSearcher::update(
+    ExecutionState *current, const std::vector<ExecutionState *> &addedStates,
+    const std::vector<ExecutionState *> &removedStates) {
+  SonarSearcher::update(current, addedStates, removedStates);
+
+  // Add interesting but not yet added states to the nested searcher
+  std::vector<ExecutionState *> nestedAddedStates;
+  for (std::vector<ExecutionState *>::const_iterator it = addedStates.begin();
+       it != addedStates.end(); ++it) {
+    if ((*it)->relationToTarget == ExecutionState::shouldBeAnalyzed) {
+      nestedAddedStates.push_back(*it);
+    }
+  }
+
+  ExecutionState *nestedCurrent = NULL;
+  if (current) {
+    // Current is now interesting, but was not added earlier
+    if (current->relationToTarget == ExecutionState::shouldBeAnalyzed &&
+        std::find(nestedAddedStates.begin(), nestedAddedStates.end(),
+                  current) == nestedAddedStates.end() &&
+        std::find(removedStates.begin(), removedStates.end(), current) == removedStates.end()) {
+      // Just add it now
+      nestedAddedStates.push_back(current);
+    }
+    // Current was added earlier
+    if (current->relationToTarget == ExecutionState::isAnalyzed) {
+      // Update it
+      nestedCurrent = current;
+    }
+  }
+
+  // Only states added earlier should be removed from the nested searcher
+  std::vector<ExecutionState *> nestedRemovedStates;
+  for (std::vector<ExecutionState *>::const_iterator it = removedStates.begin();
+       it != removedStates.end(); ++it) {
+    if ((*it)->relationToTarget == ExecutionState::isAnalyzed) {
+      nestedRemovedStates.push_back(*it);
+    }
+  }
+
+  // Update the nested searcher with the new states
+  nestedSearcher.update(nestedCurrent, nestedAddedStates, nestedRemovedStates);
+
+  // Update the states inside the execution states
+  for (std::vector<ExecutionState *>::const_iterator it =
+           nestedAddedStates.begin();
+       it != nestedAddedStates.end(); ++it) {
+    (*it)->relationToTarget = ExecutionState::isAnalyzed;
+  }
+  for (std::vector<ExecutionState *>::const_iterator it =
+           nestedRemovedStates.begin();
+       it != nestedRemovedStates.end(); ++it) {
+    (*it)->relationToTarget = ExecutionState::shouldBeAnalyzed;
+  }
+}
+
+void SonarDeepSearcher::terminateStateIfRequired(ExecutionState *state, uint64_t distance) {
+  // Only irrelevant states should be terminated early
+  if (state->relationToTarget == ExecutionState::notRelevant) {
+    SonarSearcher::terminateStateIfRequired(state, distance);
+  }
 }
 
 ///
