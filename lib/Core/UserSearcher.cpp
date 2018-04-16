@@ -32,7 +32,9 @@ namespace {
 			clEnumValN(Searcher::NURS_CPICnt, "nurs:cpicnt", "use NURS with CallPath-Instr-Count"),
 			clEnumValN(Searcher::NURS_QC, "nurs:qc", "use NURS with Query-Cost"),
       clEnumValN(Searcher::Sonar, "sonar", "use sonar search for targeted analysis"),
+      clEnumValN(Searcher::Dropout, "dropout", "use weighted dropout search with query cost"),
 			clEnumValEnd));
+        
 
   cl::opt<bool>
   UseIterativeDeepeningTimeSearch("use-iterative-deepening-time-search", 
@@ -125,7 +127,7 @@ Searcher *getNewSearcher(Searcher::CoreSearchType type, Executor &executor) {
   case Searcher::NURS_CPICnt: searcher = new WeightedRandomSearcher(WeightedRandomSearcher::CPInstCount); break;
   case Searcher::NURS_QC: searcher = new WeightedRandomSearcher(WeightedRandomSearcher::QueryCost); break;
   case Searcher::Sonar:
-
+  {
     auto sonarDistance = (SonarDistance.empty()) ? Scanner::Decisions : *SonarDistance.begin();
     auto sonarTarget = (SonarTarget.empty()) ? Scanner::AssertFail : *SonarTarget.begin();
 
@@ -135,6 +137,10 @@ Searcher *getNewSearcher(Searcher::CoreSearchType type, Executor &executor) {
       searcher = new SonarDeepSearcher(executor, sonarDistance,sonarTarget, TargetInfo, ContinueUnreachable);
     }
     break;
+  }
+  case Searcher::Dropout:
+    searcher = new WeightedDropoutSearcher(WeightedDropoutSearcher::QueryCost); 
+    break; 
   }
 
   return searcher;

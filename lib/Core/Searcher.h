@@ -80,7 +80,8 @@ namespace klee {
       NURS_ICnt,
       NURS_CPICnt,
       NURS_QC,
-      Sonar
+      Sonar,
+      Dropout
     };
   };
 
@@ -346,6 +347,51 @@ namespace klee {
     }
   };
 
+
+
+
+class WeightedDropoutSearcher : public Searcher {
+  public:
+    enum WeightType {
+      Depth,
+      QueryCost,
+      InstCount,
+      CPInstCount,
+      MinDistToUncovered,
+      CoveringNew
+    };
+
+  private:
+    double weightThreshold = 0.01f;
+
+    DiscretePDF<ExecutionState*> *states;
+    WeightType type;
+    bool updateWeights;
+    
+    double getWeight(ExecutionState*);
+
+  public:
+    WeightedDropoutSearcher(WeightType type);
+    ~WeightedDropoutSearcher();
+
+    ExecutionState &selectState();
+    void update(ExecutionState *current,
+                const std::vector<ExecutionState *> &addedStates,
+                const std::vector<ExecutionState *> &removedStates);
+    bool empty();
+    void printName(llvm::raw_ostream &os) {
+      os << "WeightedDropoutSearcher::";
+      switch(type) {
+      case Depth              : os << "Depth\n"; return;
+      case QueryCost          : os << "QueryCost\n"; return;
+      case InstCount          : os << "InstCount\n"; return;
+      case CPInstCount        : os << "CPInstCount\n"; return;
+      case MinDistToUncovered : os << "MinDistToUncovered\n"; return;
+      case CoveringNew        : os << "CoveringNew\n"; return;
+      default                 : os << "<unknown type>\n"; return;
+      }
+    }
+  };
 }
 
 #endif

@@ -44,6 +44,7 @@
 #include <cassert>
 #include <fstream>
 #include <climits>
+#include <iostream>
 
 using namespace klee;
 using namespace llvm;
@@ -812,4 +813,103 @@ void InterleavedSearcher::update(
   for (std::vector<Searcher*>::const_iterator it = searchers.begin(),
          ie = searchers.end(); it != ie; ++it)
     (*it)->update(current, addedStates, removedStates);
+}
+
+
+
+
+
+WeightedDropoutSearcher::WeightedDropoutSearcher(WeightType _type)
+  : states(new DiscretePDF<ExecutionState*>()),
+    type(_type) {
+  switch(type) {
+  case Depth: 
+    updateWeights = false;
+    break;
+  case InstCount:
+  case CPInstCount:
+  case QueryCost:
+  case MinDistToUncovered:
+  case CoveringNew:
+    updateWeights = true;
+    break;
+  default:
+    assert(0 && "invalid weight type");
+  }
+}
+
+WeightedDropoutSearcher::~WeightedDropoutSearcher() {
+  delete states;
+}
+
+ExecutionState &WeightedDropoutSearcher::selectState() {
+  return *states->choose(theRNG.getDoubleL());
+}
+
+double WeightedDropoutSearcher::getWeight(ExecutionState *es) {
+  switch(type) {
+  default:
+  case Depth: 
+    return es->weight;
+  case InstCount: {
+    uint64_t count = theStatisticManager->getIndexedValue(stats::instructions,
+                                                          es->pc->info->id);
+    double inv = 1. / std::max((uint64_t) 1, count);
+    return inv * inv;
+  }
+  case CPInstCount: {
+    StackFrame &sf = es->stack.back();
+    uint64_t count = sf.callPathNode->statistics.getValue(stats::instructions);
+    double inv = 1. / std::max((uint64_t) 1, count);
+    return inv;
+  }
+  case QueryCost:
+    return (es->queryCost < .1) ? 1. : 1./es->queryCost;
+  case CoveringNew:
+  case MinDistToUncovered: {
+    uint64_t md2u = computeMinDistToUncovered(es->pc,
+                                              es->stack.back().minDistToUncoveredOnReturn);
+
+    double invMD2U = 1. / (md2u ? md2u : 10000);
+    if (type==CoveringNew) {
+      double invCovNew = 0.;
+      if (es->instsSinceCovNew)
+        invCovNew = 1. / std::max(1, (int) es->instsSinceCovNew - 1000);
+      return (invCovNew * invCovNew + invMD2U * invMD2U);
+    } else {
+      return invMD2U * invMD2U;
+    }
+  }
+  }
+}
+
+void WeightedDropoutSearcher::update(
+    ExecutionState *current, const std::vector<ExecutionState *> &addedStates,
+    const std::vector<ExecutionState *> &removedStates) {     
+  if (current && updateWeights &&
+      std::find(removedStates.begin(), removedStates.end(), current) ==
+          removedStates.end()) {
+      
+      states->update(current, getWeight(current));
+  }
+
+  for (std::vector<ExecutionState *>::const_iterator it = addedStates.begin(),
+                                                     ie = addedStates.end();
+       it != ie; ++it) {
+    ExecutionState *es = *it;
+    std::cout << (es->queryCost > weightThreshold) << std::endl;
+    if(es->queryCost > weightThreshold) 
+        states->insert(es, getWeight(es));
+  }
+
+  for (std::vector<ExecutionState *>::const_iterator it = removedStates.begin(),
+                                                     ie = removedStates.end();
+       it != ie; ++it) {
+    if(states->inTree(*it)) 
+         states->remove(*it);
+  }
+}
+
+bool WeightedDropoutSearcher::empty() { 
+  return states->empty(); 
 }
