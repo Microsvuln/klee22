@@ -43,6 +43,11 @@ namespace klee {
 
     virtual bool empty() = 0;
 
+    // As klee is compiled without RTTI information we need a way to receive the dropped states in DropoutSearchers  
+    virtual std::vector<ExecutionState*> takeDroppedStates() {
+        return {};
+    }
+
     // prints name of searcher as a klee_message()
     // TODO: could probably make prettier or more flexible
     virtual void printName(llvm::raw_ostream &os) {
@@ -362,9 +367,10 @@ class WeightedDropoutSearcher : public Searcher {
     };
 
   private:
-    double weightThreshold = 0.01f;
+    double weightThreshold = 10000;
 
     DiscretePDF<ExecutionState*> *states;
+    std::vector<ExecutionState*> droppedStates;
     WeightType type;
     bool updateWeights;
     
@@ -378,7 +384,10 @@ class WeightedDropoutSearcher : public Searcher {
     void update(ExecutionState *current,
                 const std::vector<ExecutionState *> &addedStates,
                 const std::vector<ExecutionState *> &removedStates);
+    std::vector<ExecutionState*> takeDroppedStates();
+    
     bool empty();
+    
     void printName(llvm::raw_ostream &os) {
       os << "WeightedDropoutSearcher::";
       switch(type) {

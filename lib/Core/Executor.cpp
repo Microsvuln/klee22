@@ -2566,8 +2566,17 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 void Executor::updateStates(ExecutionState *current) {
   if (searcher) {
     searcher->update(current, addedStates, removedStates);
-  }
   
+ 
+    // remove dropped states, for non-dropping searchers takeDroppedStates will be empty
+    for(auto* es : searcher->takeDroppedStates()) {
+      auto found = std::find(addedStates.begin(), addedStates.end(), es); 
+      if(found != addedStates.end()) { 
+        addedStates.erase(found);
+      }
+    } 
+  }
+
   states.insert(addedStates.begin(), addedStates.end());
   addedStates.clear();
 

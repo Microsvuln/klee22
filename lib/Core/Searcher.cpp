@@ -886,6 +886,7 @@ double WeightedDropoutSearcher::getWeight(ExecutionState *es) {
 void WeightedDropoutSearcher::update(
     ExecutionState *current, const std::vector<ExecutionState *> &addedStates,
     const std::vector<ExecutionState *> &removedStates) {     
+       
   if (current && updateWeights &&
       std::find(removedStates.begin(), removedStates.end(), current) ==
           removedStates.end()) {
@@ -893,14 +894,39 @@ void WeightedDropoutSearcher::update(
       states->update(current, getWeight(current));
   }
 
+  static int globalTotal = 0, globalAccepted = 0;
+  int localTotal = addedStates.size(), localAccepted = 0;
+
+  double weightSum = 0.f;
+
   for (std::vector<ExecutionState *>::const_iterator it = addedStates.begin(),
                                                      ie = addedStates.end();
        it != ie; ++it) {
     ExecutionState *es = *it;
-    std::cout << (es->queryCost > weightThreshold) << std::endl;
-    if(es->queryCost > weightThreshold) 
-        states->insert(es, getWeight(es));
+
+    double weight = es->weight;
+
+    weightSum += weight;
+
+    if(states->empty() || weight < weightThreshold) {
+        states->insert(es, weight);
+        localAccepted++;
+    }
+    else { 
+        droppedStates.push_back(es);
+    }
   }
+
+  if(addedStates.size() > 0) 
+      weightThreshold = weightSum/addedStates.size();
+
+  globalTotal += localTotal;
+  globalAccepted += localAccepted;
+
+  static int counter = 0;
+
+  //std::cout << (counter++) << ": " << weightThreshold << " | " << (1.0 * localAccepted / localTotal) << " | " << (1.0 * globalAccepted / globalTotal) << std::endl;
+
 
   for (std::vector<ExecutionState *>::const_iterator it = removedStates.begin(),
                                                      ie = removedStates.end();
@@ -908,6 +934,12 @@ void WeightedDropoutSearcher::update(
     if(states->inTree(*it)) 
          states->remove(*it);
   }
+}
+
+std::vector<ExecutionState*> WeightedDropoutSearcher::takeDroppedStates() {
+  auto out = std::move(droppedStates);
+  droppedStates = std::vector<ExecutionState*>();
+  return out; 
 }
 
 bool WeightedDropoutSearcher::empty() { 
