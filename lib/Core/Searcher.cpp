@@ -846,6 +846,7 @@ ExecutionState &WeightedDropoutSearcher::selectState() {
   return *states->choose(theRNG.getDoubleL());
 }
 
+//Copied from WeightedRandomSearcher
 double WeightedDropoutSearcher::getWeight(ExecutionState *es) {
   switch(type) {
   default:
@@ -894,23 +895,25 @@ void WeightedDropoutSearcher::update(
       states->update(current, getWeight(current));
   }
 
-  static int globalTotal = 0, globalAccepted = 0;
-  int localTotal = addedStates.size(), localAccepted = 0;
+  // @Stats
+  //static int globalTotal = 0, globalAccepted = 0;
+  //int localTotal = addedStates.size(), localAccepted = 0;
 
   double weightSum = 0.f;
 
   for (std::vector<ExecutionState *>::const_iterator it = addedStates.begin(),
                                                      ie = addedStates.end();
        it != ie; ++it) {
-    ExecutionState *es = *it;
+    ExecutionState *es = *it;k
 
-    double weight = es->weight;
+    double weight = es->queryCost; //getWeight(es);
 
     weightSum += weight;
 
-    if(states->empty() || weight < weightThreshold) {
+    if(states->empty() || weight > weightThreshold) {
         states->insert(es, weight);
-        localAccepted++;
+        // @Stats
+        //localAccepted++;
     }
     else { 
         droppedStates.push_back(es);
@@ -920,11 +923,10 @@ void WeightedDropoutSearcher::update(
   if(addedStates.size() > 0) 
       weightThreshold = weightSum/addedStates.size();
 
-  globalTotal += localTotal;
-  globalAccepted += localAccepted;
-
-  static int counter = 0;
-
+  // @Stats
+  //globalTotal += localTotal;
+  //globalAccepted += localAccepted;
+  //static int counter = 0;
   //std::cout << (counter++) << ": " << weightThreshold << " | " << (1.0 * localAccepted / localTotal) << " | " << (1.0 * globalAccepted / globalTotal) << std::endl;
 
 

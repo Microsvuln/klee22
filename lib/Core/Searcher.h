@@ -367,7 +367,7 @@ class WeightedDropoutSearcher : public Searcher {
     };
 
   private:
-    double weightThreshold = 10000;
+    double weightThreshold = 100;
 
     DiscretePDF<ExecutionState*> *states;
     std::vector<ExecutionState*> droppedStates;
