@@ -904,7 +904,7 @@ void WeightedDropoutSearcher::update(
   for (std::vector<ExecutionState *>::const_iterator it = addedStates.begin(),
                                                      ie = addedStates.end();
        it != ie; ++it) {
-    ExecutionState *es = *it;k
+    ExecutionState *es = *it;
 
     double weight = es->queryCost; //getWeight(es);
 
