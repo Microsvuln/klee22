@@ -1533,7 +1533,11 @@ int main(int argc, char **argv, char **envp) {
   uint64_t instructions =
     *theStatisticManager->getStatisticByName("Instructions");
   uint64_t forks =
-    *theStatisticManager->getStatisticByName("Forks");
+      *theStatisticManager->getStatisticByName("Forks");
+  //uint64_t totalStates =
+  //    *theStatisticManager->getStatisticByName("TotalStateCount");
+  //uint64_t droppedStates =
+  //    *theStatisticManager->getStatisticByName("DroppedStateCount");
 
   handler->getInfoStream()
     << "KLEE: done: explored paths = " << 1 + forks << "\n";
@@ -1558,6 +1562,9 @@ int main(int argc, char **argv, char **envp) {
         << handler->getNumPathsExplored() << "\n";
   stats << "KLEE: done: generated tests = "
         << handler->getNumTestCases() << "\n";
+  //stats << "KLEE done: dropped state percentage = "
+  //      << (1. * droppedStates/totalStates) << "\n";
+
 
   bool useColors = llvm::errs().is_displayed();
   if (useColors)

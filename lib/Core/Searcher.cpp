@@ -819,8 +819,9 @@ void InterleavedSearcher::update(
 
 
 
-WeightedDropoutSearcher::WeightedDropoutSearcher(WeightType _type)
-  : states(new DiscretePDF<ExecutionState*>()),
+WeightedDropoutSearcher::WeightedDropoutSearcher(WeightType _type, double stdDevMultiplier)
+  : stdDevMultiplier(stdDevMultiplier),
+    states(new DiscretePDF<ExecutionState*>()),
     type(_type) {
   switch(type) {
   case Depth: 
@@ -896,39 +897,70 @@ void WeightedDropoutSearcher::update(
   }
 
   // @Stats
-  //static int globalTotal = 0, globalAccepted = 0;
-  //int localTotal = addedStates.size(), localAccepted = 0;
+  static bool receivedNewState = true;
+  static int globalTotal = 0, globalAccepted = 0;
+  int localTotal = addedStates.size(), localAcceptedEmpty = 0, localAcceptedSmall = 0, localAcceptedBelowThreshold = 0;
 
-  double weightSum = 0.f;
+  static double weightSum = 0.f, weightSquaredSum = 0.f;
+  static int weightCount = 0; 
 
   for (std::vector<ExecutionState *>::const_iterator it = addedStates.begin(),
                                                      ie = addedStates.end();
        it != ie; ++it) {
+    receivedNewState = true;
+
     ExecutionState *es = *it;
 
-    double weight = es->queryCost; //getWeight(es);
+    double weight = getWeight(es);
 
-    weightSum += weight;
-
-    if(states->empty() || weight > weightThreshold) {
+    if(states->empty()) {
         states->insert(es, weight);
+        
+        //std::cout << "States empty; Accepted state with weight " << weight << std::endl;
         // @Stats
-        //localAccepted++;
+        localAcceptedEmpty++;
+
+        // @onlyAccepted
+        // weightSum += weight;
+        // weightSquaredSum += weight * weight;
+    }
+    else if (weight >= weightThreshold) {
+        std::cout << "Accepted state with weight: " << weight << std::endl;
+
+        localAcceptedBelowThreshold++;
+
+        weightSum += weight;
+        weightSquaredSum += weight * weight;
+
+        states->insert(es, weight);
     }
     else { 
         droppedStates.push_back(es);
+        std::cout << "Denied state with weight " << weight << std::endl;
     }
   }
 
-  if(addedStates.size() > 0) 
-      weightThreshold = weightSum/addedStates.size();
+  weightCount += localAcceptedBelowThreshold; //@onlyAccepted: localAccepted;
+
 
   // @Stats
-  //globalTotal += localTotal;
-  //globalAccepted += localAccepted;
-  //static int counter = 0;
-  //std::cout << (counter++) << ": " << weightThreshold << " | " << (1.0 * localAccepted / localTotal) << " | " << (1.0 * globalAccepted / globalTotal) << std::endl;
+  globalTotal += addedStates.size(); 
+  globalAccepted += localAcceptedEmpty + localAcceptedSmall + localAcceptedBelowThreshold;
+  static int counter = 0;
 
+  if(receivedNewState) {     
+      if(weightCount > 0 && localAcceptedBelowThreshold > 0) {
+          double stdDeviation_squared = weightSquaredSum/weightCount - (weightSum/weightCount * weightSum / weightCount);
+          
+          weightThreshold = weightSum/weightCount + stdDevMultiplier  * sqrt(stdDeviation_squared > 0 ? stdDeviation_squared : 0);
+      }      
+
+      //@Debug
+      //std::cout << counter << ": Treshold:" << weightThreshold << " | LocalAcceptedPercentage (Empty, Small, Below): " << (1.0 * localAcceptedEmpty / localTotal) << ' ' << (1.0 * localAcceptedSmall / localTotal) << ' ' << (1.0 * localAcceptedBelowThreshold/localTotal) <<  " | GlobalAcceptedPercentage: " << (1.0 * globalAccepted / globalTotal) << std::endl;
+      receivedNewState = false;
+  }
+
+  counter++;
 
   for (std::vector<ExecutionState *>::const_iterator it = removedStates.begin(),
                                                      ie = removedStates.end();

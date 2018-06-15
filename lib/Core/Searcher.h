@@ -365,9 +365,9 @@ class WeightedDropoutSearcher : public Searcher {
       MinDistToUncovered,
       CoveringNew
     };
-
   private:
-    double weightThreshold = 100;
+    double weightThreshold = 1;
+    double stdDevMultiplier;
 
     DiscretePDF<ExecutionState*> *states;
     std::vector<ExecutionState*> droppedStates;
@@ -377,7 +377,7 @@ class WeightedDropoutSearcher : public Searcher {
     double getWeight(ExecutionState*);
 
   public:
-    WeightedDropoutSearcher(WeightType type);
+    WeightedDropoutSearcher(WeightType type, double standardDeviationMultiplier = -2.0);
     ~WeightedDropoutSearcher();
 
     ExecutionState &selectState();

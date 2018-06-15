@@ -35,6 +35,10 @@ namespace {
       clEnumValN(Searcher::Dropout, "dropout", "use weighted dropout search with query cost"),
 			clEnumValEnd));
         
+  cl::opt<double>
+  StdDeviationMultiplier("dropout-stddev",
+          cl::desc("Control amount of states Klee drops (-3 many to 1 almost none"),
+          cl::init(-2));
 
   cl::opt<bool>
   UseIterativeDeepeningTimeSearch("use-iterative-deepening-time-search", 
@@ -139,7 +143,7 @@ Searcher *getNewSearcher(Searcher::CoreSearchType type, Executor &executor) {
     break;
   }
   case Searcher::Dropout:
-    searcher = new WeightedDropoutSearcher(WeightedDropoutSearcher::QueryCost); 
+    searcher = new WeightedDropoutSearcher(WeightedDropoutSearcher::QueryCost, StdDeviationMultiplier); 
     break; 
   }
 

@@ -2570,10 +2570,12 @@ void Executor::updateStates(ExecutionState *current) {
  
     // remove dropped states, for non-dropping searchers takeDroppedStates will be empty
     for(auto* es : searcher->takeDroppedStates()) {
-      auto found = std::find(addedStates.begin(), addedStates.end(), es); 
-      if(found != addedStates.end()) { 
-        addedStates.erase(found);
-      }
+      //auto found = std::find(addedStates.begin(), addedStates.end(), es); 
+
+      //if(found != addedStates.end()) { 
+      //  addedStates.erase(found);
+      //}
+      removedStates.push_back(es);
     } 
   }
 
