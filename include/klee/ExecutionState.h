@@ -106,6 +106,9 @@ public:
   /// used for searchers to decide what paths to explore
   double weight;
 
+  enum RelationToTarget { notRelevant, shouldBeAnalyzed, isAnalyzed };
+  RelationToTarget relationToTarget;
+
   /// @brief Exploration depth, i.e., number of times KLEE branched for this state
   unsigned depth;
 
