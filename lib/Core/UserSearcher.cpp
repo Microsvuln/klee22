@@ -143,7 +143,7 @@ Searcher *getNewSearcher(Searcher::CoreSearchType type, Executor &executor) {
     break;
   }
   case Searcher::Dropout:
-    searcher = new WeightedDropoutSearcher(WeightedDropoutSearcher::QueryCost, StdDeviationMultiplier); 
+    searcher = new WeightedDropoutSearcher(executor, WeightedDropoutSearcher::QueryCost, StdDeviationMultiplier); 
     break; 
   }
 

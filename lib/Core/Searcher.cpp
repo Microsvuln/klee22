@@ -819,8 +819,9 @@ void InterleavedSearcher::update(
 
 
 
-WeightedDropoutSearcher::WeightedDropoutSearcher(WeightType _type, double stdDevMultiplier)
-  : stdDevMultiplier(stdDevMultiplier),
+WeightedDropoutSearcher::WeightedDropoutSearcher(Executor &_executor, WeightType _type, double stdDevMultiplier)
+  : executor(_executor),
+    stdDevMultiplier(stdDevMultiplier),
     states(new DiscretePDF<ExecutionState*>()),
     type(_type) {
   switch(type) {
@@ -904,7 +905,7 @@ void WeightedDropoutSearcher::update(
   static double weightSum = 0.f, weightSquaredSum = 0.f;
   static int weightCount = 0; 
 
-  for (std::vector<ExecutionState *>::const_iterator it = addedStates.begin(),
+  for (std::vector<ExecutionState*>::const_iterator it = addedStates.begin(),
                                                      ie = addedStates.end();
        it != ie; ++it) {
     receivedNewState = true;
@@ -925,7 +926,7 @@ void WeightedDropoutSearcher::update(
         // weightSquaredSum += weight * weight;
     }
     else if (weight >= weightThreshold) {
-        std::cout << "Accepted state with weight: " << weight << std::endl;
+        //std::cout << "Accepted state with weight: " << weight << std::endl;
 
         localAcceptedBelowThreshold++;
 
@@ -935,6 +936,7 @@ void WeightedDropoutSearcher::update(
         states->insert(es, weight);
     }
     else { 
+        executor.terminateStateEarly(*es, "Query too big. Dropping state early.");
         droppedStates.push_back(es);
         std::cout << "Denied state with weight " << weight << std::endl;
     }

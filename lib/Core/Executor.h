@@ -84,6 +84,7 @@ class Executor : public Interpreter {
   friend class BumpMergingSearcher;
   friend class MergingSearcher;
   friend class SonarSearcher;
+  friend class WeightedDropoutSearcher;
   friend class RandomPathSearcher;
   friend class OwningSearcher;
   friend class WeightedRandomSearcher;

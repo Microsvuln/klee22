@@ -365,7 +365,8 @@ class WeightedDropoutSearcher : public Searcher {
       MinDistToUncovered,
       CoveringNew
     };
-  private:
+  protected:
+  //private:
     double weightThreshold = 1;
     double stdDevMultiplier;
 
@@ -377,7 +378,8 @@ class WeightedDropoutSearcher : public Searcher {
     double getWeight(ExecutionState*);
 
   public:
-    WeightedDropoutSearcher(WeightType type, double standardDeviationMultiplier = -2.0);
+    Executor &executor;
+    WeightedDropoutSearcher(Executor &_executor, WeightType type, double standardDeviationMultiplier = -2.0);
     ~WeightedDropoutSearcher();
 
     ExecutionState &selectState();
