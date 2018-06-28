@@ -356,6 +356,13 @@ namespace klee {
 
 
 class WeightedDropoutSearcher : public Searcher {
+  private:
+    double runningAverage;
+    double runningStdDev;
+    long runningQueryCount;
+    double runningWeightSum;
+    double weightThreshold=1.0;
+    double stdDevMultiplier;
   public:
     enum WeightType {
       Depth,
@@ -367,15 +374,17 @@ class WeightedDropoutSearcher : public Searcher {
     };
   protected:
   //private:
-    double weightThreshold = 1;
-    double stdDevMultiplier;
-
     DiscretePDF<ExecutionState*> *states;
     std::vector<ExecutionState*> droppedStates;
     WeightType type;
     bool updateWeights;
     
     double getWeight(ExecutionState*);
+    double getRunningAverage();
+    double getRunningStdDev();
+    double getRunningQueryCount();
+    double getThreshold();
+    void updateThreshold(double weight);
 
   public:
     Executor &executor;
