@@ -18,6 +18,7 @@
 #include <set>
 #include <map>
 #include <queue>
+#include <fstream>
 
 namespace llvm {
   class BasicBlock;
@@ -143,7 +144,7 @@ namespace klee {
       CoveringNew
     };
 
-  private:
+  protected:
     DiscretePDF<ExecutionState*> *states;
     WeightType type;
     bool updateWeights;
@@ -355,7 +356,7 @@ namespace klee {
 
 
 
-class WeightedDropoutSearcher : public Searcher {
+class WeightedDropoutSearcher : public WeightedRandomSearcher {
   private:
     double runningAverage;
     double runningStdDev;
@@ -363,6 +364,7 @@ class WeightedDropoutSearcher : public Searcher {
     double runningWeightSum;
     double weightThreshold=1.0;
     double stdDevMultiplier;
+  /*
   public:
     enum WeightType {
       Depth,
@@ -372,23 +374,27 @@ class WeightedDropoutSearcher : public Searcher {
       MinDistToUncovered,
       CoveringNew
     };
+  */
   protected:
   //private:
-    DiscretePDF<ExecutionState*> *states;
+    //DiscretePDF<ExecutionState*> *states;
     std::vector<ExecutionState*> droppedStates;
-    WeightType type;
-    bool updateWeights;
+    //WeightType type;
+    //bool updateWeights;
     
-    double getWeight(ExecutionState*);
+    //double getWeight(ExecutionState*);
     double getRunningAverage();
     double getRunningStdDev();
     double getRunningQueryCount();
     double getThreshold();
     void updateThreshold(double weight);
+    bool logQueryWeights;
+    std::ofstream queryLogger;
 
   public:
     Executor &executor;
-    WeightedDropoutSearcher(Executor &_executor, WeightType type, double standardDeviationMultiplier = -2.0);
+    // WeightedDropoutSearcher(WeightType type);
+    WeightedDropoutSearcher(WeightType type, Executor &_executor, double _standardDeviationMultiplier, bool _logQueryWeights);
     ~WeightedDropoutSearcher();
 
     ExecutionState &selectState();
