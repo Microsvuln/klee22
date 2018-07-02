@@ -105,6 +105,27 @@ namespace {
       cl::desc("Continue the analysis even if the target is no longer reachable"),
       cl::init(false));
 
+  cl::list<WeightedDropoutSearcher::WeightType> DropoutWeightType (
+      "dropout-weight-type", 
+      cl::desc("Weight type for dropout searcher"), 
+      cl::values(clEnumValN(WeightedDropoutSearcher::QueryCost, "query-cost", 
+        "Cost (time) of solving the query so far (default)"), 
+        clEnumValN(WeightedDropoutSearcher::Depth, "depth",
+          "Depth of the state (in CFG?)"), 
+        clEnumValN(WeightedDropoutSearcher::CPInstCount, "cp-inst-count",
+          "Count of CP instructions"), 
+        clEnumValN(WeightedDropoutSearcher::MinDistToUncovered, "min-dist-to-uncovered",
+          "Minimum distance to uncovered instruction"), 
+        clEnumValN(WeightedDropoutSearcher::CoveringNew, "covering-new",
+          "Did I cover a new instruction?"),
+        clEnumValEnd)
+      );
+
+  cl::opt<bool> logQueryWeights(
+      "log-query-weights", 
+      cl::desc("Log all query weights, including accepted, rejected, dropped and running average"), 
+      cl::init(true));
+
 }
 
 
@@ -143,7 +164,8 @@ Searcher *getNewSearcher(Searcher::CoreSearchType type, Executor &executor) {
     break;
   }
   case Searcher::Dropout:
-    searcher = new WeightedDropoutSearcher(executor, WeightedDropoutSearcher::QueryCost, StdDeviationMultiplier); 
+    auto dropoutWeightType = (DropoutWeightType.empty()) ? WeightedDropoutSearcher::QueryCost : *DropoutWeightType.begin();
+    searcher = new WeightedDropoutSearcher(dropoutWeightType, executor, StdDeviationMultiplier, logQueryWeights); 
     break; 
   }
 
