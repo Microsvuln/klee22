@@ -815,15 +815,13 @@ void InterleavedSearcher::update(
     (*it)->update(current, addedStates, removedStates);
 }
 
+WeightedDropoutSearcher::WeightedDropoutSearcher(WeightType _type, Executor &_executor, double _stdDevMultiplier, bool _logQueryWeights)
+  : WeightedRandomSearcher(_type),
+    executor(_executor),
+    stdDevMultiplier(_stdDevMultiplier), 
+    logQueryWeights(_logQueryWeights) {
 
-
-
-
-WeightedDropoutSearcher::WeightedDropoutSearcher(Executor &_executor, WeightType _type, double stdDevMultiplier)
-  : executor(_executor),
-    stdDevMultiplier(stdDevMultiplier),
-    states(new DiscretePDF<ExecutionState*>()),
-    type(_type) {
+  /*
   switch(type) {
   case Depth: 
     updateWeights = false;
@@ -837,65 +835,33 @@ WeightedDropoutSearcher::WeightedDropoutSearcher(Executor &_executor, WeightType
     break;
   default:
     assert(0 && "invalid weight type");
-  }
+  } */
   runningAverage = 0.0;
   runningStdDev = 0.0;
   runningQueryCount = 0;
   runningWeightSum = 0.0;
+  
+  if (logQueryWeights) {
+    queryLogger.open(executor.interpreterHandler->getOutputFilename("query-weights.log"), std::ios::app);
+  }
+
 }
 
 WeightedDropoutSearcher::~WeightedDropoutSearcher() {
-  delete states;
+  if (logQueryWeight) {
+    queryLogger.close();
+  }
+  // delete states;
 }
 
 ExecutionState &WeightedDropoutSearcher::selectState() {
   return *states->choose(theRNG.getDoubleL());
 }
 
-//Copied from WeightedRandomSearcher
-double WeightedDropoutSearcher::getWeight(ExecutionState *es) {
-  switch(type) {
-  default:
-  case Depth: 
-    return es->weight;
-  case InstCount: {
-    uint64_t count = theStatisticManager->getIndexedValue(stats::instructions,
-                                                          es->pc->info->id);
-    double inv = 1. / std::max((uint64_t) 1, count);
-    return inv * inv;
-  }
-  case CPInstCount: {
-    StackFrame &sf = es->stack.back();
-    uint64_t count = sf.callPathNode->statistics.getValue(stats::instructions);
-    double inv = 1. / std::max((uint64_t) 1, count);
-    return inv;
-  }
-  case QueryCost:
-    return (es->queryCost < .1) ? 1. : 1./es->queryCost;
-  case CoveringNew:
-  case MinDistToUncovered: {
-    uint64_t md2u = computeMinDistToUncovered(es->pc,
-                                              es->stack.back().minDistToUncoveredOnReturn);
-
-    double invMD2U = 1. / (md2u ? md2u : 10000);
-    if (type==CoveringNew) {
-      double invCovNew = 0.;
-      if (es->instsSinceCovNew)
-        invCovNew = 1. / std::max(1, (int) es->instsSinceCovNew - 1000);
-      return (invCovNew * invCovNew + invMD2U * invMD2U);
-    } else {
-      return invMD2U * invMD2U;
-    }
-  }
-  }
-}
-
 void WeightedDropoutSearcher::update(
     ExecutionState *current, const std::vector<ExecutionState *> &addedStates,
     const std::vector<ExecutionState *> &removedStates) {     
        
-  std::ofstream queryLogger;
-  queryLogger.open("query-weights.log", std::ios::app);
 
   if (current && updateWeights &&
       std::find(removedStates.begin(), removedStates.end(), current) ==
@@ -903,6 +869,8 @@ void WeightedDropoutSearcher::update(
       
       states->update(current, getWeight(current));
   }
+  
+
 
   // @Stats
   static bool receivedNewState = true;
@@ -928,7 +896,7 @@ void WeightedDropoutSearcher::update(
       
       localAcceptedEmpty++;
 
-      queryLogger << "Accepted: " << weight;
+      queryLogger << "Accepted: " << weight << "\tKept: 1 ";
 
       // @onlyAccepted
       updateThreshold(weight);
@@ -943,7 +911,7 @@ void WeightedDropoutSearcher::update(
 
       localAcceptedBelowThreshold++;
       
-      queryLogger << "Accepted: " << weight;
+      queryLogger << "Accepted: " << weight << "\tKept: 1";
       updateThreshold(weight);
 
       /*
@@ -956,14 +924,14 @@ void WeightedDropoutSearcher::update(
     else {  // Otherwise maybe drop it
       bool decider = theRNG.getBool();
       if(!decider) {
-        queryLogger << "Rejected: Dropped: " << weight;
+        queryLogger << "Rejected: " << weight << "\tKept: 0";
         executor.stepInstruction(*es);
         executor.terminateStateEarly(*es, "Query too big. Dropping state early.");
         droppedStates.push_back(es);
       }
       else {
         localAcceptedAboveThreshold++;
-        queryLogger << "Rejected: Kept: " << weight;
+        queryLogger << "Rejected: " << weight << "\tKept: 1";
         updateThreshold(weight);
         /*
         weightCount++;
@@ -975,7 +943,7 @@ void WeightedDropoutSearcher::update(
     }
 
     //weightCount += localAcceptedBelowThreshold+localAcceptedEmpty + localAcceptedAboveThreshold; //@onlyAccepted: localAccepted;
-    queryLogger << " Running average: " << getRunningAverage() << "\n";
+    queryLogger << "\tAverage: " << getRunningAverage() << "\tThreshold: " << getThreshold() << "\n";
   }
   // Why is this being counted outside the loop?
   // weightCount += localAcceptedBelowThreshold+localAcceptedEmpty + localAcceptedAboveThreshold; //@onlyAccepted: localAccepted;
@@ -1001,7 +969,6 @@ void WeightedDropoutSearcher::update(
 
   counter++;
   */
-  queryLogger.close();
 
   for (std::vector<ExecutionState *>::const_iterator it = removedStates.begin(),
                                                      ie = removedStates.end();
@@ -1042,15 +1009,19 @@ double WeightedDropoutSearcher::getThreshold() {
 }
 
 void WeightedDropoutSearcher::updateThreshold(double weight) {
+  double lastRunningAverage = runningAverage;
+  
   runningQueryCount++;
 
-  // The running variance
-  double runningVariance = ((runningQueryCount-2)*runningStdDev*runningStdDev)*(runningQueryCount-1) + ((weight-runningAverage)*(weight-runningAverage))/(runningQueryCount);
+  // The running average
+  runningAverage = runningAverage + (weight-runningAverage)/runningQueryCount;
+
+  // The running variance and standard deviation
+  double runningVariance = (((runningQueryCount-1)*runningStdDev*runningStdDev)/(runningQueryCount)) + (((weight-runningAverage)*(weight-lastRunningAverage))/(runningQueryCount));
   runningStdDev = sqrt(runningVariance);
   
   // Also the running average
-  runningAverage = (weight + (runningQueryCount-1)*runningAverage) / runningQueryCount;
+  // runningAverage = (weight + (runningQueryCount-1)*runningAverage) / runningQueryCount;
 
   weightThreshold = runningAverage + stdDevMultiplier*runningStdDev;
-
 }
