@@ -11,7 +11,7 @@
 class Scanner {
 public:
   enum Distance { Decisions, Instructions };
-  enum Target { AllReturns, AssertFail, FunctionCall, FunctionReturn };
+  enum Target { AllReturns, AssertFail, FunctionCall, BasicBlockID, FunctionReturn };
 
 protected:
   llvm::Module *const module;

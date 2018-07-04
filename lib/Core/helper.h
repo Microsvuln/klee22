@@ -18,3 +18,10 @@ inline constexpr uint64_t sumOrMax(uint64_t a, Args... args) {
 
 bool isCallToFunction(const llvm::Instruction *inst,
                       const llvm::StringRef funcName);
+
+bool isInFunction(const llvm::Instruction *inst,
+                  const llvm::StringRef funcName);
+
+bool isInBasicBlock(const llvm::Instruction *instr,
+                    const llvm::StringRef BB_stg);
+

@@ -69,6 +69,8 @@ namespace {
                                 "Aim for failing assert statements (default)"),
                clEnumValN(Scanner::FunctionCall, "function-call",
                           "Aim for the call to a specific function"),
+               clEnumValN(Scanner::BasicBlockID, "basic-block",
+                          "Aim for the call to a specific basic-block"),
                clEnumValN(Scanner::FunctionReturn, "function-return",
                           "Aim for the return of a specific function"),
                clEnumValEnd));
