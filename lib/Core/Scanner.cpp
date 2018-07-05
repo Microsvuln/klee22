@@ -28,6 +28,17 @@ bool Scanner::isTarget(const llvm::Instruction *instr) {
   case FunctionCall:
     return isCallToFunction(instr, targetinfo);
     break;
+  case BasicBlockID: {
+    //return llvm::isa<llvm::BasicBlock>(instr);
+    /*
+       func, label = stripBasicBlockID();
+       return isInFunction(instr, func) && isInBlock(instr, label);
+    */
+      const std::pair<llvm::StringRef, llvm::StringRef> funcLabel = 
+        llvm::cast<llvm::StringRef>(targetinfo).split(':');
+      return isInFunction(instr, funcLabel.first) && isInBasicBlock(instr, funcLabel.second); 
+      break;
+    }
   case FunctionReturn:
     if (llvm::isa<llvm::ReturnInst>(instr)) {
       const llvm::Function *func = instr->getParent()->getParent();
