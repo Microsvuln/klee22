@@ -848,7 +848,7 @@ WeightedDropoutSearcher::WeightedDropoutSearcher(WeightType _type, Executor &_ex
 }
 
 WeightedDropoutSearcher::~WeightedDropoutSearcher() {
-  if (logQueryWeight) {
+  if (logQueryWeights) {
     queryLogger.close();
   }
   // delete states;
