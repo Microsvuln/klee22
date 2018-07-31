@@ -1023,5 +1023,5 @@ void WeightedDropoutSearcher::updateThreshold(double weight) {
   // Also the running average
   // runningAverage = (weight + (runningQueryCount-1)*runningAverage) / runningQueryCount;
 
-  weightThreshold = runningAverage + stdDevMultiplier*runningStdDev;
+  weightThreshold = (runningAverage + stdDevMultiplier*runningStdDev)>0.0 ? (runningAverage + stdDevMultiplier*runningStdDev) : 0.0 ;
 }
