@@ -130,6 +130,35 @@ Searcher *getNewSearcher(Searcher::CoreSearchType type, Executor &executor) {
 
     auto sonarDistance = (SonarDistance.empty()) ? Scanner::Decisions : *SonarDistance.begin();
     auto sonarTarget = (SonarTarget.empty()) ? Scanner::AssertFail : *SonarTarget.begin();
+    size_t separator_location_index;
+    switch (sonarTarget) {
+      case Scanner::BasicBlockID:
+        // must have a "function name: basic block id" in the TargetInfo
+        if (TargetInfo.compare("-") == 0) {
+          klee_error("sonar-target-info is needed");
+        }
+
+        // we need both a function name and a basic block id
+        separator_location_index = TargetInfo.find(':');
+        if ( (separator_location_index == std::string::npos) ||      // ':' not found
+             (separator_location_index == 0) ||                      // function name missing
+             (separator_location_index == TargetInfo.size() - 1) ) { // basic block ID missing
+          klee_error("incorrect basic-block ID. Expected function_name:bb_id");
+        }
+        break;
+      case Scanner::FunctionCall:
+      case Scanner::FunctionReturn:
+        // must have a function name in the TargetInfo
+        if (TargetInfo.compare("-") == 0) {
+          klee_error("sonar-target-info is needed");
+        }
+        break;
+      case Scanner::AllReturns:
+      case Scanner::AssertFail: // @todo: missing from the parameter list?
+      default:
+        // do nothing
+        break;
+    }
 
     if (StopAtTarget) {
       searcher = new SonarSearcher(executor, sonarDistance,sonarTarget, TargetInfo, ContinueUnreachable);

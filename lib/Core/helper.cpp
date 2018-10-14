@@ -1,5 +1,6 @@
 #include "./helper.h"
 #include "llvm/IR/Function.h"
+#include "llvm/Support/raw_ostream.h"
 
 bool isCallToFunction(const llvm::Instruction *inst,
                       const llvm::StringRef funcName) {
@@ -33,13 +34,22 @@ bool isInFunction(const llvm::Instruction *inst,
 
 bool isInBasicBlock(const llvm::Instruction *instr,
                     const llvm::StringRef BB_stg) {
-  const llvm::BasicBlock *BB = llvm::cast<llvm::BasicBlock*>(BB_stg);
   //find out the basic block of the instruction
   if(llvm::isa<llvm::Instruction>(instr)) {
     const llvm::BasicBlock *instBB = instr->getParent();
-    //then check if the basic clock is same as BB
-    if (BB && (BB == instBB)) 
-      return true;
+
+    // check if the instBB is the one that we are looking for
+    /*
+    // check if instBB points to a named basic block
+    if ( instBB->hasName() ) {
+      return instBB->getName().equals(BB_stg);
+    }
+    */
+    std::string s;
+    llvm::raw_string_ostream OS{s};
+    instBB->print(OS);
+
+    return (s.find(std::string("; <label>:") + BB_stg.data() + " ") != std::string::npos);
   }
   return false;
 }

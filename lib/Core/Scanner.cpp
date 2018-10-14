@@ -17,6 +17,7 @@
 #include <cstdint>
 
 
+
 bool Scanner::isTarget(const llvm::Instruction *instr) {
   switch (this->target) {
   case AllReturns:
@@ -35,7 +36,7 @@ bool Scanner::isTarget(const llvm::Instruction *instr) {
        return isInFunction(instr, func) && isInBlock(instr, label);
     */
       const std::pair<llvm::StringRef, llvm::StringRef> funcLabel = 
-        llvm::cast<llvm::StringRef>(targetinfo).split(':');
+        llvm::StringRef(targetinfo).split(':');
       return isInFunction(instr, funcLabel.first) && isInBasicBlock(instr, funcLabel.second); 
       break;
     }
