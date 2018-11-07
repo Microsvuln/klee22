@@ -44,6 +44,10 @@ extern "C" {
   /* return true iff file at path matches KTest header */
   int   kTest_isKTestFile(const char *path);
 
+  /* reads AFL testcase as KTest file */
+  /* returns NULL on (unspecified) error */
+  //KTest* kTest_fromAFLFile(const char *path, const char *bc);
+
   /* returns NULL on (unspecified) error */
   KTest* kTest_fromFile(const char *path);
 
