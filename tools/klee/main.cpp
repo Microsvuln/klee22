@@ -70,6 +70,8 @@
 #include <iomanip>
 #include <iterator>
 #include <sstream>
+#include <algorithm>
+#include <iostream>
 
 
 using namespace llvm;
@@ -588,6 +590,60 @@ void KleeHandler::getKTestFilesInDir(std::string directoryPath,
     }
   }
 
+  if (ec) {
+    llvm::errs() << "ERROR: unable to read output directory: " << directoryPath
+                 << ": " << ec.message() << "\n";
+    exit(1);
+  }
+}
+
+void KleeHandler::getAFLCommandLineArgsFromFuzzerStats(std::string f, std::vector<std::string> &argv) {
+  std::ifstream fuzzerStats(f);
+
+  std::string line;
+  while(std::getline(fuzzerStats, line)) {
+    std::istringstream testStream(line);
+    std::string attribute, colonDummy;
+    testStream >> attribute >> colonDummy;
+    if(attribute!="command_line")
+      continue;
+
+    // Tokenize by reading the whole line again
+    std::vector<std::string> tokens;
+    std::istringstream iss(line);
+    std::copy(std::istream_iterator<std::string>(iss), 
+        std::istream_iterator<std::string>(),
+        std::back_inserter(tokens));
+
+    // Start reading from the back and see how many arguments are there
+    for(std::vector<std::string>::const_iterator t = tokens.end(); t!=tokens.begin(); --t) {
+      // Skip file placeholder "@@"
+      if(t->find("@@")!=std::string::npos) {
+        continue;
+      }
+      // Only considered an arg if it starts with "-"
+      std::size_t loc = t->find("-");
+      if(loc!=0) // We have read all arguments there are to read
+        break;
+      argv.push_back(*t);
+    }
+  }
+}
+
+void KleeHandler::getAFLCommandLineArgs(std::string directoryPath, std::vector<std::string> &argv) {
+#if LLVM_VERSION_CODE < LLVM_VERSION(3, 5)
+  error_code ec;
+#else
+  std::error_code ec;
+#endif
+  llvm::sys::fs::directory_iterator i(directoryPath, ec), e;
+  for (; i!=e && !ec; i.increment(ec)) {
+    auto f = i->path();
+    if (llvm::sys::path::filename(f).find("fuzzer_stats")==0) {
+      getAFLCommandLineArgsFromFuzzerStats(f, argv);
+      std::cout << "Read " << argv.size() << " arguments from the fuzzer out.\n";
+    }
+  }
   if (ec) {
     llvm::errs() << "ERROR: unable to read output directory: " << directoryPath
                  << ": " << ec.message() << "\n";
