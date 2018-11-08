@@ -652,6 +652,52 @@ void KleeHandler::getAFLCommandLineArgs(std::string directoryPath, std::vector<s
   }
 }
 
+/* Read AFL testcases and load them */
+void KleeHandler::getAFLTestFilesInDir(std::string directoryPath, 
+                                    std::vector<std::string> &results) {
+#if LLVM_VERSION_CODE < LLVM_VERSION(3, 5)
+  error_code ec;
+#else
+  std::error_code ec;
+#endif
+  llvm::sys::fs::directory_iterator i(directoryPath, ec), e;
+  for (; i!=e && !ec; i.increment(ec)) {
+    auto f = i->path();
+    /* Get test cases from 'queue' */
+    if (f.substr(f.size()-5, f.size()) == "queue") {
+      std::vector<std::string> files = {};
+      KleeHandler::getAFLInputsInQueue(f, files);
+      if(files.size()>0) {
+        results.insert(results.end(), files.begin(), files.end());
+      }
+    }
+
+    /* Get test cases from 'crashes' */
+    if (f.substr(f.size()-5, f.size()) == "crashes") {
+      std::vector<std::string> files = {};
+      KleeHandler::getAFLInputsInQueue(f, files);
+      if(files.size()>0) {
+        results.insert(results.end(), files.begin(), files.end());
+      }
+    }
+
+    /* Get test cases from 'hangs' */
+    if (f.substr(f.size()-5, f.size()) == "hangs") {
+      std::vector<std::string> files = {};
+      KleeHandler::getAFLInputsInQueue(f, files);
+      if(files.size()>0) {
+        results.insert(results.end(), files.begin(), files.end());
+      }
+    }
+  }
+    
+  if (ec) {
+    llvm::errs() << "ERROR: unable to read output directory: " << directoryPath
+                 << ": " << ec.message() << "\n";
+    exit(1);
+  }
+}
+
 void KleeHandler::getAFLInputsInQueue(std::string directoryPath, 
                                     std::vector<std::string> &files) {
 #if LLVM_VERSION_CODE < LLVM_VERSION(3, 5)
