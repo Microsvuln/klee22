@@ -8,6 +8,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "klee/Internal/ADT/KTest.h"
+#include "klee/Internal/ADT/AFLTest.h"
 
 #include <stdlib.h>
 #include <string.h>

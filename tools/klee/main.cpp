@@ -15,6 +15,7 @@
 #include "klee/Statistics.h"
 #include "klee/Config/Version.h"
 #include "klee/Internal/ADT/KTest.h"
+#include "klee/Internal/ADT/AFLTest.h"
 #include "klee/Internal/ADT/TreeStream.h"
 #include "klee/Internal/Support/Debug.h"
 #include "klee/Internal/Support/ModuleUtil.h"
