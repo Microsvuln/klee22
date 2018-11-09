@@ -8,10 +8,18 @@
 //===----------------------------------------------------------------------===//
 
 #include "klee/Internal/ADT/KTest.h"
+#include "klee/Internal/ADT/AFLTest.h"
 
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+
+#include <fstream>
+#include <sstream>
+#include <vector>
+#include <assert.h>
+#include <iostream>
+
 
 #define KTEST_VERSION 3
 #define KTEST_MAGIC_SIZE 5
@@ -21,6 +29,7 @@
 #define BOUT_MAGIC "BOUT\n"
 
 /***/
+using namespace std;
 
 static int read_uint32(FILE *f, unsigned *value_out) {
   unsigned char data[4];
@@ -172,6 +181,252 @@ KTest *kTest_fromFile(const char *path) {
 
   if (f) fclose(f);
 
+  return 0;
+}
+
+KTest *kTest_fromAFLFile(const char* path, const char* bc, std::vector<std::string> argv) {
+  // assert(!strcmp(inputType, "stdin") || !strcmp(inputType, "file"));
+  
+  /*
+  FILE *f = fopen(path, "rb");
+  unsigned i, version;
+
+  if (!f) {
+    fclose(f);
+    return 0;
+  }
+  */
+  /* Pre-initialization so goto doesn't complain*/
+  KTestObject* obj;
+  size_t inputSize;
+  std::string inputBuffer;
+  std::string inputStat;
+  int argInd;
+  int *dum;
+  /* TODO: Remove this and take as a parameter */
+  // std::vector<std::string> argv(2, "-a");
+  
+  /* Create and initialize the ktest object */
+  KTest* newKTest = (KTest*)calloc(1, sizeof(KTest));
+  if(!newKTest) {
+    return 0;
+  }
+
+  newKTest->version = kTest_getCurrentVersion();
+
+  /* Read the input file into buffer */
+  {
+    std::ifstream instream_input(path);
+    std::stringstream input_stream;
+    input_stream << instream_input.rdbuf();
+    inputBuffer = input_stream.str();
+  }
+  
+  inputSize = inputBuffer.size();
+  
+  inputStat = "\xff\xff\xff\xff\xff\xff\xff\xff\x01\x00\x00\x00\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\x00\x00\x00\x00\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\x00\x00\x00\x00\x00\x00\x00\x00\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff";
+  
+  /* Now say what the arguments to KLEE should be */
+  /* dummy.bc A --sym-files 1 1 <file_size> --sym-stdin <stdin_size>  */
+  newKTest->numArgs = 8;
+
+  newKTest->args = (char**)calloc(newKTest->numArgs, sizeof(char*));
+  if(!newKTest->args)
+    goto error;
+  
+  argInd = 0;
+
+  newKTest->args[argInd] = (char*)calloc(1, strlen(bc)+1); // args[0]
+  if(!newKTest->args[argInd])
+    goto error;
+
+  strcpy(newKTest->args[argInd], bc);
+  argInd++;
+
+  newKTest->args[argInd] = (char*)calloc(1, strlen("A")+1); // args[1]
+  if(!newKTest->args[argInd])
+    goto error;
+
+  strcpy(newKTest->args[argInd], "A");
+  argInd++;
+  
+  newKTest->args[argInd] = (char*)calloc(1, strlen("--sym-files")+1); // args[2]
+  if(!newKTest->args[argInd])
+    goto error;
+
+  strcpy(newKTest->args[argInd], "--sym-files");
+  argInd++;
+  
+  newKTest->args[argInd] = (char*)calloc(1, strlen("1")+1); // args[3]
+  if(!newKTest->args[argInd])
+    goto error;
+
+  strcpy(newKTest->args[argInd], "1");
+  argInd++;
+  
+  newKTest->args[argInd] = (char*)calloc(1, strlen("1")+1); // args[4]
+  if(!newKTest->args[argInd])
+    goto error;
+
+  strcpy(newKTest->args[argInd], "1");
+  argInd++;
+ 
+  newKTest->args[argInd] = (char*)calloc(1, std::to_string(inputSize).size()+1); // args[5]
+  if(!newKTest->args[argInd])
+    goto error;
+
+  strcpy(newKTest->args[argInd], std::to_string(inputSize).c_str());
+  argInd++;
+
+  newKTest->args[argInd] = (char*)calloc(1, strlen("--sym-stdin")+1); // args[6]
+  if(!newKTest->args[argInd])
+    goto error;
+
+  strcpy(newKTest->args[argInd], "--sym-stdin");
+  argInd++;
+  
+  newKTest->args[argInd] = (char*)calloc(1, std::to_string(inputSize).size()+1); // args[7]
+  if(!newKTest->args[argInd])
+    goto error;
+
+  strcpy(newKTest->args[argInd], std::to_string(inputSize).c_str());
+  argInd++;
+  
+ 
+  /* These are zero because the input is either stdin or file */
+  /* No, actually they are zero because I don't know what the heck they do*/
+  newKTest->symArgvs = 0;
+  newKTest->symArgvLen = 0;
+  
+  /* Allocate array for KTestObjects */
+  /* Objects: A-data, A-data-stat, stdin, stdin-stat, model_version */
+  newKTest->numObjects = 5;
+
+  if(argv.size()>0) {
+    newKTest->numObjects += 1; // for "n_args"
+    newKTest->numObjects += static_cast<int>(argv.size()); // for arg0 to argN
+  }
+
+  newKTest->objects = (KTestObject*)calloc(newKTest->numObjects, sizeof(*newKTest->objects));
+  if(!newKTest->objects)
+    goto error;
+
+  obj = newKTest->objects;
+
+  /* Are there any command line args? If so then make them symbolic */
+  if(static_cast<int>(argv.size())>0) {
+    obj->name = (char*)calloc(1, strlen("n_args") + 1);
+    if(!obj->name)
+      goto error;
+    strcpy(obj->name, "n_args");
+    obj->numBytes = 4;
+    obj->bytes = (unsigned char*)calloc(1, sizeof(int));
+    if(!obj->bytes)
+      goto error;
+    dum = (int*)malloc(sizeof(int));
+    *dum = static_cast<int>(argv.size());
+    memcpy(obj->bytes, dum, obj->numBytes);
+    obj++;
+
+    int n_args = static_cast<int>(argv.size());
+    for(int i=0; i<n_args; i++) {
+      obj->name = (char*)calloc(1, strlen("arg0")+1);
+      if(!obj->name)
+        goto error;
+      strcpy(obj->name, ("arg"+std::to_string(i)).c_str());
+      obj->numBytes = argv[i].size();
+      obj->bytes = (unsigned char*)calloc(1, argv[i].size()+1);
+      if(!obj->bytes)
+        goto error;
+      memcpy(obj->bytes, const_cast<char*>(argv[i].c_str()), obj->numBytes);
+      obj->bytes[obj->numBytes] = 0;
+      obj++;
+    }
+  }
+
+  /* Finally add the data from AFL testcases */
+  obj->name = (char*)calloc(1, strlen("A-data")+1);
+  if(!obj->name)
+    goto error;
+  strcpy(obj->name, "A-data");
+  obj->numBytes = inputSize;
+  obj->bytes = (unsigned char*)calloc(1, obj->numBytes+1);
+  if(!obj->bytes)
+    goto error;
+  memcpy(obj->bytes, const_cast<char*>(inputBuffer.c_str()), obj->numBytes);
+  obj->bytes[obj->numBytes] = 0;
+  obj++;
+
+  obj->name = (char*)calloc(1, strlen("A-data-stat")+1);
+  if(!obj->name)
+    goto error;
+  strcpy(obj->name, "A-data-stat");
+  obj->numBytes = 144;
+  obj->bytes = (unsigned char*)calloc(1, 144);
+  if(!obj->bytes)
+    goto error;
+  memcpy(obj->bytes, inputStat.c_str(), inputStat.size());
+  // obj->bytes[obj->numBytes] = 0;
+  obj++;
+  
+  obj->name = (char*)calloc(1, strlen("stdin")+1);
+  if(!obj->name)
+    goto error;
+  strcpy(obj->name, "stdin");
+  obj->numBytes = inputSize;
+  obj->bytes = (unsigned char*)calloc(1, obj->numBytes+1);
+  if(!obj->bytes)
+    goto error;
+  memcpy(obj->bytes, const_cast<char*>(inputBuffer.c_str()), obj->numBytes);
+  obj->bytes[obj->numBytes] = 0;
+  obj++;
+
+  obj->name = (char*)calloc(1, strlen("stdin-stat")+1);
+  if(!obj->name)
+    goto error;
+  strcpy(obj->name, "stdin-stat");
+  obj->numBytes = 144;
+  obj->bytes = (unsigned char*)calloc(1, 144);
+  if(!obj->bytes)
+    goto error;
+  memcpy(obj->bytes, inputStat.c_str(), inputStat.size());
+  // obj->bytes[obj->numBytes] = 0;
+  obj++;
+  
+  obj->name = (char*)calloc(1, strlen("model_version")+1);
+  if(!obj->name)
+    goto error;
+  strcpy(obj->name, "model_version");
+  obj->numBytes = 4;
+  obj->bytes = (unsigned char*)calloc(1, sizeof(int));
+  if(!obj->bytes)
+    goto error;
+  dum = (int*)malloc(sizeof(int));
+  *dum = 1;
+  memcpy(obj->bytes, dum, obj->numBytes);
+  
+  kTest_toFile(newKTest, "/var/tmp/intermediate.ktest");
+  return newKTest;
+ error:
+  if (newKTest) {
+    if (newKTest->args) {
+      for (unsigned i=0; i<newKTest->numArgs; i++)
+        if (newKTest->args[i])
+          free(newKTest->args[i]);
+      free(newKTest->args);
+    }
+    if (newKTest->objects) {
+      for (unsigned i=0; i<newKTest->numObjects; i++) {
+        KTestObject *bo = &newKTest->objects[i];
+        if (bo->name)
+          free(bo->name);
+        if (bo->bytes)
+          free(bo->bytes);
+      }
+      free(newKTest->objects);
+    }
+    free(newKTest);
+  }
   return 0;
 }
 

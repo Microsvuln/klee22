@@ -15,6 +15,7 @@
 #include "klee/Statistics.h"
 #include "klee/Config/Version.h"
 #include "klee/Internal/ADT/KTest.h"
+#include "klee/Internal/ADT/AFLTest.h"
 #include "klee/Internal/ADT/TreeStream.h"
 #include "klee/Internal/Support/Debug.h"
 #include "klee/Internal/Support/ModuleUtil.h"
@@ -70,6 +71,8 @@
 #include <iomanip>
 #include <iterator>
 #include <sstream>
+#include <algorithm>
+#include <iostream>
 
 
 using namespace llvm;
@@ -201,6 +204,9 @@ namespace {
   SeedOutDir("seed-out-dir");
 
   cl::list<std::string>
+  AFLSeedOutDir("afl-seed-out-dir");
+  
+  cl::list<std::string>
   LinkLibraries("link-llvm-lib",
 		cl::desc("Link the given libraries before execution"),
 		cl::value_desc("library file"));
@@ -266,6 +272,13 @@ public:
   static void loadPathFile(std::string name,
                            std::vector<bool> &buffer);
 
+  static void getAFLInputsInQueue(std::string directoryPath,
+                                  std::vector<std::string> &results);
+  static void getAFLCommandLineArgsFromFuzzerStats(std::string fuzzerStats, std::vector<std::string> &argv);
+  static void getAFLCommandLineArgs(std::string directoryPath, 
+                                 std::vector<std::string> &args);
+  static void getAFLTestFilesInDir(std::string directoryPath, 
+                                 std::vector<std::string> &results);
   static void getKTestFilesInDir(std::string directoryPath,
                                  std::vector<std::string> &results);
 
@@ -578,6 +591,127 @@ void KleeHandler::getKTestFilesInDir(std::string directoryPath,
     }
   }
 
+  if (ec) {
+    llvm::errs() << "ERROR: unable to read output directory: " << directoryPath
+                 << ": " << ec.message() << "\n";
+    exit(1);
+  }
+}
+
+void KleeHandler::getAFLCommandLineArgsFromFuzzerStats(std::string f, std::vector<std::string> &argv) {
+  std::ifstream fuzzerStats(f);
+
+  std::string line;
+  while(std::getline(fuzzerStats, line)) {
+    std::istringstream testStream(line);
+    std::string attribute, colonDummy;
+    testStream >> attribute >> colonDummy;
+    if(attribute!="command_line")
+      continue;
+
+    // Tokenize by reading the whole line again
+    std::vector<std::string> tokens;
+    std::istringstream iss(line);
+    std::copy(std::istream_iterator<std::string>(iss), 
+        std::istream_iterator<std::string>(),
+        std::back_inserter(tokens));
+
+    // Start reading from the back and see how many arguments are there
+    for(std::vector<std::string>::const_iterator t = tokens.end(); t!=tokens.begin(); --t) {
+      // Skip file placeholder "@@"
+      if(t->find("@@")!=std::string::npos) {
+        continue;
+      }
+      // Only considered an arg if it starts with "-"
+      std::size_t loc = t->find("-");
+      if(loc!=0) // We have read all arguments there are to read
+        break;
+      argv.push_back(*t);
+    }
+  }
+}
+
+void KleeHandler::getAFLCommandLineArgs(std::string directoryPath, std::vector<std::string> &argv) {
+#if LLVM_VERSION_CODE < LLVM_VERSION(3, 5)
+  error_code ec;
+#else
+  std::error_code ec;
+#endif
+  llvm::sys::fs::directory_iterator i(directoryPath, ec), e;
+  for (; i!=e && !ec; i.increment(ec)) {
+    auto f = i->path();
+    if (llvm::sys::path::filename(f).find("fuzzer_stats")==0) {
+      getAFLCommandLineArgsFromFuzzerStats(f, argv);
+      std::cout << "Read " << argv.size() << " arguments from the fuzzer out.\n";
+    }
+  }
+  if (ec) {
+    llvm::errs() << "ERROR: unable to read output directory: " << directoryPath
+                 << ": " << ec.message() << "\n";
+    exit(1);
+  }
+}
+
+/* Read AFL testcases and load them */
+void KleeHandler::getAFLTestFilesInDir(std::string directoryPath, 
+                                    std::vector<std::string> &results) {
+#if LLVM_VERSION_CODE < LLVM_VERSION(3, 5)
+  error_code ec;
+#else
+  std::error_code ec;
+#endif
+  llvm::sys::fs::directory_iterator i(directoryPath, ec), e;
+  for (; i!=e && !ec; i.increment(ec)) {
+    auto f = i->path();
+    /* Get test cases from 'queue' */
+    if (f.substr(f.size()-5, f.size()) == "queue") {
+      std::vector<std::string> files = {};
+      KleeHandler::getAFLInputsInQueue(f, files);
+      if(files.size()>0) {
+        results.insert(results.end(), files.begin(), files.end());
+      }
+    }
+
+    /* Get test cases from 'crashes' */
+    if (f.substr(f.size()-5, f.size()) == "crashes") {
+      std::vector<std::string> files = {};
+      KleeHandler::getAFLInputsInQueue(f, files);
+      if(files.size()>0) {
+        results.insert(results.end(), files.begin(), files.end());
+      }
+    }
+
+    /* Get test cases from 'hangs' */
+    if (f.substr(f.size()-5, f.size()) == "hangs") {
+      std::vector<std::string> files = {};
+      KleeHandler::getAFLInputsInQueue(f, files);
+      if(files.size()>0) {
+        results.insert(results.end(), files.begin(), files.end());
+      }
+    }
+  }
+    
+  if (ec) {
+    llvm::errs() << "ERROR: unable to read output directory: " << directoryPath
+                 << ": " << ec.message() << "\n";
+    exit(1);
+  }
+}
+
+void KleeHandler::getAFLInputsInQueue(std::string directoryPath, 
+                                    std::vector<std::string> &files) {
+#if LLVM_VERSION_CODE < LLVM_VERSION(3, 5)
+  error_code ec;
+#else
+  std::error_code ec;
+#endif
+  llvm::sys::fs::directory_iterator i(directoryPath, ec), e;
+  for (; i!=e && !ec; i.increment(ec)) {
+    auto f = i->path();
+    if (f.find("id:00")==std::string::npos)
+      continue;
+    files.push_back(f);
+  }
   if (ec) {
     llvm::errs() << "ERROR: unable to read output directory: " << directoryPath
                  << ": " << ec.message() << "\n";
@@ -1490,6 +1624,33 @@ int main(int argc, char **argv, char **envp) {
       }
     }
 
+    /* Read from AFL results dir */
+    /* Should be always run with zero-seed-extension, named-seed-matching and allow-seed-extension */
+    if(AFLSeedOutDir.size()>0) {
+      klee_message("You have chosen to seed KLEE with AFL testcases.");
+      klee_message("\tIf you didn't use -zero-seed-extension, -named-seed-matching and -allow-seed-extension, AFL seeding might be useless.\n");
+    }
+    for (std::vector<std::string>::iterator
+           it = AFLSeedOutDir.begin(), ie = AFLSeedOutDir.end();
+         it != ie; ++it) {
+      std::vector<std::string> AFLInputFiles;
+      KleeHandler::getAFLTestFilesInDir(*it, AFLInputFiles);
+      std::vector<std::string> AFLArgv;
+      KleeHandler::getAFLCommandLineArgs(*it, AFLArgv);
+      for (std::vector<std::string>::iterator
+             it2 = AFLInputFiles.begin(), ie = AFLInputFiles.end();
+           it2 != ie; ++it2) {
+        KTest *out = kTest_fromAFLFile(it2->c_str(), "dummy.bc", AFLArgv);
+        if (!out) {
+          klee_error("unable to open: %s\n", (*it2).c_str());
+        }
+        seeds.push_back(out);
+      }
+      if (AFLInputFiles.empty()) {
+        klee_error("Didn't find any testcases in: %s\n", (*it).c_str());
+      }
+    }
+    
     if (!seeds.empty()) {
       klee_message("KLEE: using %lu seeds\n", seeds.size());
       interpreter->useSeeds(&seeds);
